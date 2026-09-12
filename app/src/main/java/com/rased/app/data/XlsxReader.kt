@@ -18,6 +18,19 @@ class XlsxReader(private val context: Context) {
         headerAliases: Set<String>,
         retainRow: (Map<String, String>) -> Boolean = { true }
     ): List<Map<String, String>> {
+        val rows = mutableListOf<Map<String, String>>()
+        forEachRow(uri, sheetName, headerAliases) { row ->
+            if (retainRow(row)) rows += row
+        }
+        return rows
+    }
+
+    fun forEachRow(
+        uri: Uri,
+        sheetName: String,
+        headerAliases: Set<String>,
+        onRow: (Map<String, String>) -> Unit
+    ) {
         // A content URI need not be seekable. Spool the compressed archive to disk,
         // then stream only the workbook metadata and the requested worksheet.
         val file = File.createTempFile("xlsx-", ".zip", context.cacheDir)
@@ -26,7 +39,7 @@ class XlsxReader(private val context: Context) {
                 requireNotNull(input) { "تعذر فتح ملف Excel" }
                 file.outputStream().use { input.copyTo(it) }
             }
-            return ZipFile(file).use { zip ->
+            ZipFile(file).use { zip ->
                 val target = findSheetTarget(zip, sheetName)
                     ?: error("لم يتم العثور على شيت باسم \"$sheetName\"")
                 SharedStrings(context.cacheDir).use { sharedStrings ->
@@ -34,7 +47,6 @@ class XlsxReader(private val context: Context) {
                         zip.getInputStream(entry).use { parseSharedStrings(it, sharedStrings) }
                     }
                     val entry = zip.getEntry(target) ?: error("تعذر قراءة الشيت المطلوب")
-                    val rows = mutableListOf<Map<String, String>>()
                     val aliases = headerAliases.map(::normalizeHeader).toSet()
                     var headers: Map<Int, String>? = null
                     var rowCount = 0
@@ -51,12 +63,11 @@ class XlsxReader(private val context: Context) {
                             } else {
                                 val mapped = linkedMapOf<String, String>()
                                 currentHeaders.forEach { (col, header) -> mapped[header] = row[col].orEmpty().trim() }
-                                if (mapped.values.any { it.isNotBlank() } && retainRow(mapped)) rows += mapped
+                                if (mapped.values.any { it.isNotBlank() }) onRow(mapped)
                             }
                         }
                     }
                     if (headers == null) error("لم يتم العثور على صف العناوين أو عمود اللوحة")
-                    rows
                 }
             }
         } finally {

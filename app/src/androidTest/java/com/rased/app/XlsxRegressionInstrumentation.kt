@@ -21,7 +21,8 @@ class XlsxRegressionInstrumentation : Instrumentation() {
         val result = Bundle()
         try {
             verifyLargeSheet()
-            result.putString("stream", "PASS: 140 MiB worksheet, shared strings, first match, wallet order, no matches, cleanup\n")
+            val largeResult = LargeSortingRegression(this).run()
+            result.putString("stream", "PASS: 140 MiB worksheet, shared strings, first match, wallet order, no matches, cleanup\n$largeResult\n")
             finish(Activity.RESULT_OK, result)
         } catch (failure: Throwable) {
             result.putString("stream", "FAIL: ${failure.stackTraceToString()}\n")

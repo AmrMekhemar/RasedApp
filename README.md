@@ -40,9 +40,17 @@
 
 ## Large Excel regression check
 
-The reader streams worksheet XML, stores shared strings in temporary cache files,
-and keeps only the first data row matching each wallet plate. Temporary files are
-removed after each read, including failed reads.
+The reader streams worksheet XML and stores shared strings in temporary cache
+files. Wallet plates, matching, and results use a temporary SQLite database;
+only a 200-row window is loaded for the table. Memory usage no longer grows with
+the number of wallet rows or matching results. First occurrences and wallet
+order are preserved. The database is replaced on the next sort and closed when
+the ViewModel is cleared. Reader temporary files are removed after each read,
+including failed reads.
+
+Use **حفظ النتائج كاملة** to stream all results to an Excel-readable UTF-8 TSV
+file. Clipboard copying is limited to small result sets to avoid large heap
+allocations and Android clipboard transaction limits.
 
 With JDK 17 and an Android emulator/device connected:
 
@@ -54,5 +62,9 @@ adb shell am instrument -w com.rased.app.test/com.rased.app.XlsxRegressionInstru
 ```
 
 The device check prints `PASS` or `FAIL`. It generates a worksheet larger than
-140 MiB uncompressed and checks shared strings, first-match handling, wallet
-order, duplicate suppression, no matches, and temporary-file cleanup.
+140 MiB uncompressed, followed by an XLSX archive exceeding 15 MB with 30,000
+distinct matching plates and long shared-string notes. It runs the production
+ViewModel and Compose table, checks forward/backward paging and horizontal
+scrolling, duplicate suppression, first-match handling, wallet order, no matches,
+bounded clipboard copying, full TSV export, and reader temporary-file cleanup.
+It reports peak sampled Java heap usage against the device's normal heap limit.
