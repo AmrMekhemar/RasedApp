@@ -71,6 +71,11 @@ without constructing a ViewModel or opening files. Sorting has empty, loading,
 error, and results previews, plus wallet and result component previews.
 Home, unloading, and checking each have their own preview.
 
+Sorting results adapt to the available width: below 600 dp, each result is a
+full-width card with wrapping fields and an expandable note. Wider layouts use
+the scrollable table. Both layouts retain bounded paging for large result sets.
+Phone (320 dp), tablet, and large-font card previews cover the responsive layout.
+
 Build all modules and run their lint checks:
 
 ```powershell

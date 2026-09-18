@@ -22,7 +22,7 @@ import com.rased.feature.sorting.domain.SortingResult
 import com.rased.feature.sorting.ui.components.FilePickerCard
 import com.rased.feature.sorting.ui.components.WalletInputCard
 import com.rased.feature.sorting.ui.components.ResultsActions
-import com.rased.feature.sorting.ui.components.ResultsTable
+import com.rased.feature.sorting.ui.components.SortingResults
 
 /** Pure UI: state flows down and user actions flow up to the route. */
 @Composable
@@ -89,7 +89,7 @@ fun SortingScreen(
 
             if (state.resultCount > 0) {
                 item { ResultsActions(state.resultCount, state.isExporting, onCopyResults, onSaveResults) }
-                item { ResultsTable(state.results, state.resultCount, state.resultStart, onVisibleRow) }
+                item { SortingResults(state.results, state.resultCount, state.resultStart, onVisibleRow) }
             }
         }
     }

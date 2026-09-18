@@ -6,6 +6,8 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
@@ -13,12 +15,15 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import com.rased.feature.sorting.data.SortingStore
 import com.rased.core.excel.XlsxReader
 import com.rased.feature.sorting.domain.SortingEngine
 import com.rased.feature.sorting.ui.components.ResultsTable
+import com.rased.feature.sorting.ui.components.SortingResults
 import com.rased.feature.sorting.ui.SortingViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -95,6 +100,30 @@ class LargeSortingRegression(private val instrumentation: Instrumentation) {
             runBlocking { withContext(Dispatchers.Main) { horizontal.scrollTo(600) } }
             instrumentation.waitForIdleSync()
             check(horizontal.value > 0)
+            // The phone layout must retain paging when cards replace table rows.
+            val cards = LazyListState()
+            instrumentation.runOnMainSync {
+                activity.setContent {
+                    val state by model.state.collectAsState()
+                    MaterialTheme {
+                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                            Box(Modifier.width(320.dp)) {
+                                SortingResults(state.results, state.resultCount, state.resultStart, model::loadVisibleRows, cards)
+                            }
+                        }
+                    }
+                }
+            }
+            instrumentation.waitForIdleSync()
+            for (index in listOf(29_900, 0)) {
+                runBlocking {
+                    withContext(Dispatchers.Main) { cards.scrollToItem(index) }
+                    withTimeout(20_000) { model.state.first { it.resultStart == index } }
+                }
+                instrumentation.waitForIdleSync()
+                check(model.state.value.results.first().plate == plate(ROWS - 1 - index))
+                check(model.state.value.results.size <= SortingStore.PAGE_SIZE * 2)
+            }
             // A quick reversal must cancel a pending page instead of replacing
             // the already visible first page with stale rows from far below.
             instrumentation.runOnMainSync {
@@ -142,7 +171,7 @@ class LargeSortingRegression(private val instrumentation: Instrumentation) {
             }
             val fileMb = workbook.length() / 1_000_000
             val heapMb = peak.get() / 1_048_576
-            return "PASS: ${fileMb} MB XLSX, $ROWS distinct matches, real table paging both directions, horizontal scroll, bounded copy, full export; peak sampled heap ${heapMb} MiB / ${runtime.maxMemory() / 1_048_576} MiB"
+            return "PASS: ${fileMb} MB XLSX, $ROWS distinct matches, table and phone-card paging both directions, horizontal scroll, bounded copy, full export; peak sampled heap ${heapMb} MiB / ${runtime.maxMemory() / 1_048_576} MiB"
         } finally {
             instrumentation.runOnMainSync {
                 activity?.finish()
