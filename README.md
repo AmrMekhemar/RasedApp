@@ -10,6 +10,7 @@
 - تصميم بسيط بخلفية بيضاء
 - شاشة رئيسية بها:
   - الفرز
+  - التفريغ - قريبًا
   - التشييك - قريبًا
 - قسم الفرز يدعم:
   - اختيار ملف الداتا Excel
@@ -36,7 +37,45 @@
 - يدعم `.xlsx` فقط في هذه النسخة.
 - ملف الداتا يجب أن يحتوي على Sheet باسم `داتا`.
 - ملف المحفظة يجب أن يحتوي على Sheet باسم `ورقة1`.
-- لا يوجد Export Excel في هذه النسخة، النسخ فقط.
+- حفظ النتائج كاملة في ملف Excel بصيغة `.xlsx`.
+
+## Project structure
+
+The app uses Android library feature modules. Features do not depend on the app
+or on one another:
+
+```text
+:app                 Activity, home screen, and navigation
+:feature:sorting     الفرز: UI, state/ViewModel, data repository, and domain rules
+:feature:unloading   التفريغ: dedicated screen (قريبًا)
+:feature:checking    التشييك: dedicated screen (قريبًا)
+:core:ui             Shared RTL theme, feature scaffold, and placeholder content
+:core:excel          Streaming XLSX reader and writer
+```
+
+`app` depends on the three feature modules and `core:ui`. Sorting depends on
+`core:ui` and `core:excel`; the other features depend only on `core:ui`.
+Unloading and checking have separate destinations; their business workflows
+are not implemented yet.
+
+Within sorting, `SortingRoute` connects Android file pickers and the ViewModel.
+`SortingScreen` receives state and callbacks, and delegates to separate wallet,
+file-picker, results-actions, and results-table components. The ViewModel
+coordinates state and background jobs; `SortingRepository` owns file access and
+matching, `SortingStore` owns SQLite storage, and `domain` holds the matching
+models and normalization rules.
+
+Open a screen or component Kotlin file in Android Studio's Split/Design view
+to see its `@Preview`. Previews use the shared Arabic RTL theme and sample data,
+without constructing a ViewModel or opening files. Sorting has empty, loading,
+error, and results previews, plus wallet and result component previews.
+Home, unloading, and checking each have their own preview.
+
+Build all modules and run their lint checks:
+
+```powershell
+.\gradlew.bat :app:assembleDebug :app:assembleDebugAndroidTest lintDebug
+```
 
 ## Large Excel regression check
 
@@ -48,7 +87,7 @@ order are preserved. The database is replaced on the next sort and closed when
 the ViewModel is cleared. Reader temporary files are removed after each read,
 including failed reads.
 
-Use **حفظ النتائج كاملة** to stream all results to an Excel-readable UTF-8 TSV
+Use **حفظ النتائج Excel** to stream all results to a native Excel `.xlsx`
 file. Clipboard copying is limited to small result sets to avoid large heap
 allocations and Android clipboard transaction limits.
 
@@ -66,5 +105,5 @@ The device check prints `PASS` or `FAIL`. It generates a worksheet larger than
 distinct matching plates and long shared-string notes. It runs the production
 ViewModel and Compose table, checks forward/backward paging and horizontal
 scrolling, duplicate suppression, first-match handling, wallet order, no matches,
-bounded clipboard copying, full TSV export, and reader temporary-file cleanup.
+bounded clipboard copying, full XLSX export, and reader temporary-file cleanup.
 It reports peak sampled Java heap usage against the device's normal heap limit.

@@ -1,4 +1,4 @@
-package com.rased.app.ui
+package com.rased.feature.sorting.ui
 
 import android.app.Application
 import android.net.Uri
@@ -7,10 +7,8 @@ import android.content.ClipboardManager
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.rased.app.data.XlsxReader
-import com.rased.app.domain.SortingEngine
-import com.rased.app.data.SortingStore
-import com.rased.app.domain.SortingResult
+import com.rased.feature.sorting.data.SortingRepository
+import com.rased.feature.sorting.data.SortingStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,21 +25,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.atomic.AtomicBoolean
 
-data class SortingUiState(
-    val dataFileUri: Uri? = null,
-    val walletFileUri: Uri? = null,
-    val useTextWallet: Boolean = false,
-    val walletText: String = "",
-    val isLoading: Boolean = false,
-    val results: List<SortingResult> = emptyList(),
-    val resultCount: Int = 0,
-    val resultStart: Int = 0,
-    val isExporting: Boolean = false,
-    val message: String? = null
-)
-
 class SortingViewModel(application: Application) : AndroidViewModel(application) {
-    private val reader = XlsxReader(application)
+    private val repository = SortingRepository(application)
     private val _state = MutableStateFlow(SortingUiState())
     val state: StateFlow<SortingUiState> = _state.asStateFlow()
     private var store: SortingStore? = null
@@ -83,27 +68,13 @@ class SortingViewModel(application: Application) : AndroidViewModel(application)
                     store?.close()
                     store = null
                 }
-                val next = SortingStore(getApplication<Application>().cacheDir)
+                val completed = repository.sort(
+                    dataUri, current.walletFileUri,
+                    current.walletText.takeIf { current.useTextWallet }
+                )
+                val next = completed.store
                 pending = next
-                val jobContext = currentCoroutineContext()
-                next.transaction {
-                    if (current.useTextWallet) {
-                        current.walletText.lineSequence().forEach {
-                            jobContext.ensureActive()
-                            next.addWalletPlate(it)
-                        }
-                    } else {
-                        reader.forEachRow(requireNotNull(current.walletFileUri), "ورقة1", SortingEngine.plateNames()) {
-                            jobContext.ensureActive()
-                            next.addWalletRow(it)
-                        }
-                    }
-                    reader.forEachRow(dataUri, "داتا", SortingEngine.plateNames()) {
-                        jobContext.ensureActive()
-                        next.matchDataRow(it)
-                    }
-                }
-                val count = next.finish()
+                val count = completed.count
                 val firstPage = next.readPage(0, SortingStore.PAGE_SIZE * 2)
                 storeMutex.withLock {
                     currentCoroutineContext().ensureActive()
@@ -160,11 +131,7 @@ class SortingViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun exportResults(uri: Uri) = withResults { source ->
-        val resolver = getApplication<Application>().contentResolver
-        requireNotNull(resolver.openOutputStream(uri, "wt")) { "تعذر حفظ النتائج" }.bufferedWriter(Charsets.UTF_8).use { writer ->
-            writer.write("\uFEFF")
-            source.writeTsv(writer)
-        }
+        repository.exportResults(source, uri)
     }
 
     private fun withResults(action: suspend (SortingStore) -> Unit) {

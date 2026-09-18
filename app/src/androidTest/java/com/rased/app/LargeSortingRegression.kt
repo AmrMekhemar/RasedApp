@@ -15,10 +15,11 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
-import com.rased.app.data.SortingStore
-import com.rased.app.data.XlsxReader
-import com.rased.app.domain.SortingEngine
-import com.rased.app.ui.SortingViewModel
+import com.rased.feature.sorting.data.SortingStore
+import com.rased.core.excel.XlsxReader
+import com.rased.feature.sorting.domain.SortingEngine
+import com.rased.feature.sorting.ui.components.ResultsTable
+import com.rased.feature.sorting.ui.SortingViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -38,7 +39,7 @@ class LargeSortingRegression(private val instrumentation: Instrumentation) {
     fun run(): String {
         val context = instrumentation.targetContext
         val workbook = File.createTempFile("large-regression-", ".xlsx", context.cacheDir)
-        val export = File.createTempFile("large-export-", ".tsv", context.cacheDir)
+        val export = File.createTempFile("large-export-", ".xlsx", context.cacheDir)
         val owner = ViewModelStore()
         val runtime = Runtime.getRuntime()
         val peak = AtomicLong()
@@ -109,7 +110,12 @@ class LargeSortingRegression(private val instrumentation: Instrumentation) {
             instrumentation.runOnMainSync { model.exportResults(Uri.fromFile(export)) }
             val exported = runBlocking { withTimeout(60_000) { model.state.first { !it.isExporting } } }
             check(exported.message == null) { exported.message.orEmpty() }
-            check(export.bufferedReader().useLines { it.count() } == ROWS + 1)
+            var exportedRows = 0
+            XlsxReader(context).forEachRow(Uri.fromFile(export), "النتائج", SortingEngine.plateNames()) {
+                check(!it["اللوحة"].isNullOrBlank())
+                exportedRows++
+            }
+            check(exportedRows == ROWS)
 
             // Database matching keeps first occurrences and preserves wallet order.
             SortingStore(context.cacheDir).use { store ->

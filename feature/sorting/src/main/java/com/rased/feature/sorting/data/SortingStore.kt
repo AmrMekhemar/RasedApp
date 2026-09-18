@@ -1,14 +1,16 @@
-package com.rased.app.data
+package com.rased.feature.sorting.data
 
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteStatement
-import com.rased.app.domain.PlateNormalizer
-import com.rased.app.domain.SortingEngine
-import com.rased.app.domain.SortingResult
+import com.rased.feature.sorting.domain.PlateNormalizer
+import com.rased.feature.sorting.domain.SortingEngine
+import com.rased.feature.sorting.domain.SortingResult
 import java.io.Closeable
 import java.io.File
+import com.rased.core.excel.XlsxWriter
 import java.io.Writer
+import java.io.OutputStream
 
 /** Each sort owns a disposable database. No workbook-sized JVM collections. */
 class SortingStore(cacheDir: File) : Closeable {
@@ -92,6 +94,15 @@ class SortingStore(cacheDir: File) : Closeable {
     fun writeTsv(writer: Writer) {
         writer.append(TSV_HEADER).append('\n')
         forEachResult { writer.append(it.toTsvRow()).append('\n') }
+    }
+
+    @Synchronized
+    fun writeXlsx(output: OutputStream) {
+        XlsxWriter.write(output, TSV_HEADER.split('\t')) { writeRow ->
+            forEachResult { result ->
+                writeRow(listOf(result.plate, result.type, result.note, result.street, result.district, result.date, result.walletType))
+            }
+        }
     }
 
     private fun forEachResult(block: (SortingResult) -> Unit) {

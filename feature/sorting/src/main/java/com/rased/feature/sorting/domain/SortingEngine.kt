@@ -1,4 +1,4 @@
-package com.rased.app.domain
+package com.rased.feature.sorting.domain
 
 object SortingEngine {
     private val plateColumnNames = setOf("اللوحة", "اللوحه", "لوحة", "لوحه")

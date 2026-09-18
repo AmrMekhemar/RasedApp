@@ -1,4 +1,4 @@
-package com.rased.app.domain
+package com.rased.feature.sorting.domain
 
 data class DataRow(
     val normalizedPlate: String,

@@ -4,8 +4,8 @@ import android.app.Activity
 import android.app.Instrumentation
 import android.net.Uri
 import android.os.Bundle
-import com.rased.app.data.XlsxReader
-import com.rased.app.domain.SortingEngine
+import com.rased.core.excel.XlsxReader
+import com.rased.feature.sorting.domain.SortingEngine
 import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
