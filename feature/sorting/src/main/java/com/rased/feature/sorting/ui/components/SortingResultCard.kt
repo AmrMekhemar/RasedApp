@@ -1,6 +1,11 @@
 package com.rased.feature.sorting.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CardDefaults
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -20,15 +25,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.rased.core.ui.RasedTheme
 import com.rased.feature.sorting.domain.SortingResult
 
 @Composable
 internal fun SortingResultCard(result: SortingResult) {
-    Card(Modifier.fillMaxWidth()) {
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, SortingStyle.Border)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("اللوحة", style = MaterialTheme.typography.labelMedium)
-            Text(result.plate, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(result.plate, modifier = Modifier.fillMaxWidth().background(SortingStyle.Tint, RoundedCornerShape(12.dp)).padding(12.dp),
+                color = SortingStyle.Teal, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             HorizontalDivider()
             ResultField("النوع", result.type)
             ResultField("نوع المحفظة", result.walletType)
@@ -73,7 +80,7 @@ private fun ResultNote(note: String?) {
 @Preview(showBackground = true, locale = "ar", widthDp = 360, fontScale = 1.5f)
 @Composable
 private fun SortingResultCardPreview() {
-    RasedTheme {
+    SortingTheme {
         SortingResultCard(SortingResult("ابج1234", "سيارة ملاكي", "ملاحظة طويلة يمكن فتحها لعرض جميع التفاصيل دون الخروج عن عرض الشاشة. ".repeat(4), "شارع النيل بجوار الميدان الرئيسي", "وسط المدينة", "2026-09-18", "خاصة"))
     }
 }
