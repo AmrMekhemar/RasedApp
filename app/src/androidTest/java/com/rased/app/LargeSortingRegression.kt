@@ -44,6 +44,7 @@ class LargeSortingRegression(private val instrumentation: Instrumentation) {
     fun run(): String {
         val context = instrumentation.targetContext
         val workbook = File.createTempFile("large-regression-", ".xlsx", context.cacheDir)
+        val walletWorkbook = File.createTempFile("wallet-regression-", ".xlsx", context.cacheDir)
         val export = File.createTempFile("large-export-", ".xlsx", context.cacheDir)
         val owner = ViewModelStore()
         val runtime = Runtime.getRuntime()
@@ -56,12 +57,16 @@ class LargeSortingRegression(private val instrumentation: Instrumentation) {
         var activity: MainActivity? = null
         try {
             makeWorkbook(workbook)
+            makeWorkbook(walletWorkbook, walletFirst = true)
             check(workbook.length() > 15_000_000) { "Fixture must exceed 15 MB compressed: ${workbook.length()}" }
             lateinit var model: SortingViewModel
             instrumentation.runOnMainSync {
                 model = ViewModelProvider(owner, ViewModelProvider.AndroidViewModelFactory(context.applicationContext as Application))[SortingViewModel::class.java]
                 model.setDataFile(Uri.fromFile(workbook))
-                model.setWalletFile(Uri.fromFile(workbook))
+                model.setWalletFile(Uri.fromFile(walletWorkbook))
+            }
+            runBlocking { withTimeout(60_000) { model.state.first { !it.isManagingFiles } } }
+            instrumentation.runOnMainSync {
                 model.startSorting()
                 model.startSorting() // Rapid duplicate taps must not start another job.
             }
@@ -179,11 +184,12 @@ class LargeSortingRegression(private val instrumentation: Instrumentation) {
             }
             sampler.shutdownNow()
             workbook.delete()
+            walletWorkbook.delete()
             export.delete()
         }
     }
 
-    private fun makeWorkbook(file: File) {
+    private fun makeWorkbook(file: File, walletFirst: Boolean = false) {
         val random = Random(12345)
         val alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
         val common = "x".repeat(4096)
@@ -194,7 +200,9 @@ class LargeSortingRegression(private val instrumentation: Instrumentation) {
                 write(value)
                 zip.closeEntry()
             }
-            entry("xl/workbook.xml", """<workbook xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="داتا" r:id="data"/><sheet name="ورقة1" r:id="wallet"/></sheets></workbook>""")
+            val sheetOrder = if (walletFirst) listOf("wallet", "data") else listOf("data", "wallet")
+            val sheets = sheetOrder.joinToString("") { """<sheet name="$it" r:id="$it"/>""" }
+            entry("xl/workbook.xml", """<workbook xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>$sheets</sheets></workbook>""")
             entry("xl/_rels/workbook.xml.rels", """<Relationships><Relationship Id="data" Target="worksheets/data.xml"/><Relationship Id="wallet" Target="worksheets/wallet.xml"/></Relationships>""")
             zip.putNextEntry(ZipEntry("xl/sharedStrings.xml"))
             write("<sst><si><t>اللوحة</t></si><si><t>الملاحظة</t></si><si><t>النوع</t></si>")

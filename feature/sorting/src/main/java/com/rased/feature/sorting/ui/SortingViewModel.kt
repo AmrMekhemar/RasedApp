@@ -11,6 +11,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.rased.feature.sorting.data.SortingRepository
 import com.rased.feature.sorting.data.SortingStore
+import com.rased.core.database.SavedFileStorage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -36,16 +37,73 @@ class SortingViewModel(application: Application) : AndroidViewModel(application)
     private var pageJob: Job? = null
     private var requestedStart = 0
     private val disposed = AtomicBoolean(false)
+    private val savedFiles = SavedFileStorage(application)
+    private val fileMutex = Mutex()
+    private var pendingFileOperations = 1
 
-    fun setDataFile(uri: Uri?) = _state.update { it.copy(dataFileUri = uri, message = null) }
-    fun setWalletFile(uri: Uri?) = _state.update { it.copy(walletFileUri = uri, message = null) }
+    init {
+        viewModelScope.launch {
+            fileMutex.withLock {
+                try {
+                    val data = savedFiles.get("sorting.data")
+                    val wallet = savedFiles.get("sorting.wallet")
+                    _state.update { it.copy(
+                        dataFileUri = data?.let(savedFiles::uri), dataFileName = data?.displayName,
+                        walletFileUri = wallet?.let(savedFiles::uri), walletFileName = wallet?.displayName
+                    ) }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    _state.update { it.copy(message = "تعذر استعادة الملفات المحفوظة") }
+                } finally {
+                    finishFileOperation()
+                }
+            }
+        }
+    }
+
+    fun setDataFile(uri: Uri?) = saveInputFile(uri, isData = true)
+    fun setWalletFile(uri: Uri?) = saveInputFile(uri, isData = false)
+
+    private fun saveInputFile(uri: Uri?, isData: Boolean) {
+        if (uri == null) return
+        if (_state.value.isLoading || _state.value.isExporting) {
+            _state.update { it.copy(message = "انتظر انتهاء العملية ثم اختر الملف الجديد") }
+            return
+        }
+        pendingFileOperations++
+        _state.update { it.copy(isManagingFiles = true, message = null) }
+        viewModelScope.launch {
+            fileMutex.withLock {
+                _state.update { it.copy(isManagingFiles = true) }
+                try {
+                    val saved = savedFiles.replace(if (isData) "sorting.data" else "sorting.wallet", uri)
+                    _state.update {
+                        if (isData) it.copy(dataFileUri = savedFiles.uri(saved), dataFileName = saved.displayName)
+                        else it.copy(walletFileUri = savedFiles.uri(saved), walletFileName = saved.displayName)
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    _state.update { it.copy(message = "تعذر حفظ الملف الجديد؛ لم يتم تغيير الملف السابق") }
+                } finally {
+                    finishFileOperation()
+                }
+            }
+        }
+    }
+    private fun finishFileOperation() {
+        pendingFileOperations--
+        _state.update { it.copy(isManagingFiles = pendingFileOperations > 0) }
+    }
+
     fun setUseTextWallet(value: Boolean) = _state.update { it.copy(useTextWallet = value, message = null) }
     fun setWalletText(value: String) = _state.update { it.copy(walletText = value, message = null) }
     fun clearMessage() = _state.update { it.copy(message = null) }
 
     fun startSorting() {
         val current = _state.value
-        if (current.isLoading || current.isExporting) return
+        if (current.isLoading || current.isExporting || current.isManagingFiles) return
         val dataUri = current.dataFileUri
         if (dataUri == null) {
             _state.update { it.copy(message = "اختر ملف الداتا أولًا") }

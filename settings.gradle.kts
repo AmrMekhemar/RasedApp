@@ -15,4 +15,5 @@ dependencyResolutionManagement {
 rootProject.name = "Rased"
 include(":app")
 include(":core:ui", ":core:excel")
+include(":core:database")
 include(":feature:sorting", ":feature:unloading", ":feature:checking")

@@ -12,14 +12,22 @@ import java.util.zip.ZipOutputStream
 
 /** Dependency-free device regression check; run with adb shell am instrument -w. */
 class XlsxRegressionInstrumentation : Instrumentation() {
+    private var persistenceMode: String? = null
     override fun onCreate(arguments: Bundle?) {
         super.onCreate(arguments)
+        persistenceMode = arguments?.getString("persistence")
         start()
     }
 
     override fun onStart() {
         val result = Bundle()
         try {
+            persistenceMode?.let { mode ->
+                SavedFilesRegression(targetContext).run(mode == "verify")
+                result.putString("stream", "PASS: persistent files ($mode), independent replacement, failed replacement retention\n")
+                finish(Activity.RESULT_OK, result)
+                return
+            }
             verifyLargeSheet()
             val largeResult = LargeSortingRegression(this).run()
             result.putString("stream", "PASS: 140 MiB worksheet, shared strings, first match, wallet order, no matches, cleanup\n$largeResult\n")

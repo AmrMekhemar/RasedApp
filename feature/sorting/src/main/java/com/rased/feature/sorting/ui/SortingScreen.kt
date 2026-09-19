@@ -59,7 +59,7 @@ fun SortingScreen(
                         FilePickerCard(
                             title = "ملف الداتا",
                             description = "سيتم قراءة أول شيت في الملف",
-                            fileName = state.dataFileUri?.lastPathSegment,
+                            fileName = state.dataFileName ?: state.dataFileUri?.lastPathSegment,
                             buttonText = "اختيار ملف الداتا",
                             onPick = onPickData
                         )
@@ -67,7 +67,7 @@ fun SortingScreen(
 
                     item {
                         WalletInputCard(
-                            state.useTextWallet, state.walletText, state.walletFileUri?.lastPathSegment,
+                            state.useTextWallet, state.walletText, state.walletFileName ?: state.walletFileUri?.lastPathSegment,
                             onUseTextWalletChange, onWalletTextChange, onPickWallet
                         )
                     }
@@ -77,10 +77,13 @@ fun SortingScreen(
                             onClick = onStartSorting,
                             modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
                             shape = RoundedCornerShape(16.dp),
-                            enabled = !state.isLoading && !state.isExporting
+                            enabled = !state.isLoading && !state.isExporting && !state.isManagingFiles
                         ) { Text(if (state.isLoading) "جاري الفرز..." else "ابدأ الفرز", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
                     }
 
+                    if (state.isManagingFiles) {
+                        item { Text("جاري تجهيز الملفات المحفوظة...", color = MaterialTheme.colorScheme.primary) }
+                    }
                     if (state.isLoading || state.message != null || state.resultCount == 0) {
                         item { SortingStatus(state.isLoading, state.message) }
                     }

@@ -6,6 +6,9 @@ import com.rased.feature.sorting.domain.SortingResult
 data class SortingUiState(
     val dataFileUri: Uri? = null,
     val walletFileUri: Uri? = null,
+    val dataFileName: String? = null,
+    val walletFileName: String? = null,
+    val isManagingFiles: Boolean = true,
     val useTextWallet: Boolean = false,
     val walletText: String = "",
     val isLoading: Boolean = false,

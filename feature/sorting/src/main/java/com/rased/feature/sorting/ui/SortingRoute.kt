@@ -1,9 +1,7 @@
 package com.rased.feature.sorting.ui
 
-import android.content.Context
 import android.content.Intent
 import android.content.ClipData
-import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
@@ -26,10 +24,10 @@ fun SortingRoute(onBack: () -> Unit, viewModel: SortingViewModel = viewModel()) 
     )
 
     val dataPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let { context.takeReadPermission(it); viewModel.setDataFile(it) }
+        uri?.let(viewModel::setDataFile)
     }
     val walletPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let { context.takeReadPermission(it); viewModel.setWalletFile(it) }
+        uri?.let(viewModel::setWalletFile)
     }
     val resultsSaver = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) { uri ->
         uri?.let(viewModel::exportResults)
@@ -59,10 +57,4 @@ fun SortingRoute(onBack: () -> Unit, viewModel: SortingViewModel = viewModel()) 
         },
         onVisibleRow = viewModel::loadVisibleRows
     )
-}
-
-private fun Context.takeReadPermission(uri: Uri) {
-    runCatching {
-        contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    }
 }
