@@ -73,7 +73,7 @@ internal fun WalletInputCard(
                 )
             } else {
                 FilePickerInline(walletFileName, "اختيار ملف المحفظة", onPickWallet)
-                Text("يحتوي على شيت باسم: ورقة1", style = MaterialTheme.typography.bodySmall, color = SortingStyle.Muted)
+                Text("سيتم قراءة أول شيت في الملف", style = MaterialTheme.typography.bodySmall, color = SortingStyle.Muted)
             }
         }
     }

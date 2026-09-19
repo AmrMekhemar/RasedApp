@@ -58,7 +58,7 @@ fun SortingScreen(
                     item {
                         FilePickerCard(
                             title = "ملف الداتا",
-                            description = "يجب أن يحتوي على شيت باسم: داتا",
+                            description = "سيتم قراءة أول شيت في الملف",
                             fileName = state.dataFileUri?.lastPathSegment,
                             buttonText = "اختيار ملف الداتا",
                             onPick = onPickData

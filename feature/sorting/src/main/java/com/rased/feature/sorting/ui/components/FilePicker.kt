@@ -56,5 +56,5 @@ internal fun FilePickerInline(fileName: String?, text: String, onPick: () -> Uni
 @Preview(showBackground = true, locale = "ar")
 @Composable
 private fun FilePickerPreview() {
-    SortingTheme { FilePickerCard("ملف الداتا", "يحتوي على شيت باسم: داتا", "data.xlsx", "اختيار ملف الداتا", {}) }
+    SortingTheme { FilePickerCard("ملف الداتا", "سيتم قراءة أول شيت في الملف", "data.xlsx", "اختيار ملف الداتا", {}) }
 }

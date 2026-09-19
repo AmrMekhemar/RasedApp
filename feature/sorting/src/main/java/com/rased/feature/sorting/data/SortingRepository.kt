@@ -22,12 +22,12 @@ internal class SortingRepository(private val context: Context) {
                         store.addWalletPlate(it)
                     }
                 } else {
-                    reader.forEachRow(requireNotNull(walletUri), "ورقة1", SortingEngine.plateNames()) {
+                    reader.forEachRow(requireNotNull(walletUri), null, SortingEngine.plateNames()) {
                         jobContext.ensureActive()
                         store.addWalletRow(it)
                     }
                 }
-                reader.forEachRow(dataUri, "داتا", SortingEngine.plateNames()) {
+                reader.forEachRow(dataUri, null, SortingEngine.plateNames()) {
                     jobContext.ensureActive()
                     store.matchDataRow(it)
                 }

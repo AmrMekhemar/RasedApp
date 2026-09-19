@@ -14,7 +14,7 @@ class XlsxReader(private val context: Context) {
 
     fun readSheet(
         uri: Uri,
-        sheetName: String,
+        sheetName: String?,
         headerAliases: Set<String>,
         retainRow: (Map<String, String>) -> Boolean = { true }
     ): List<Map<String, String>> {
@@ -27,7 +27,7 @@ class XlsxReader(private val context: Context) {
 
     fun forEachRow(
         uri: Uri,
-        sheetName: String,
+        sheetName: String?,
         headerAliases: Set<String>,
         onRow: (Map<String, String>) -> Unit
     ) {
@@ -41,7 +41,7 @@ class XlsxReader(private val context: Context) {
             }
             ZipFile(file).use { zip ->
                 val target = findSheetTarget(zip, sheetName)
-                    ?: error("لم يتم العثور على شيت باسم \"$sheetName\"")
+                    ?: error(if (sheetName == null) "لم يتم العثور على أول شيت في الملف" else "لم يتم العثور على شيت باسم \"$sheetName\"")
                 SharedStrings(context.cacheDir).use { sharedStrings ->
                     zip.getEntry("xl/sharedStrings.xml")?.let { entry ->
                         zip.getInputStream(entry).use { parseSharedStrings(it, sharedStrings) }
@@ -75,7 +75,7 @@ class XlsxReader(private val context: Context) {
         }
     }
 
-    private fun findSheetTarget(zip: ZipFile, wantedName: String): String? {
+    private fun findSheetTarget(zip: ZipFile, wantedName: String?): String? {
         val workbook = zip.getEntry("xl/workbook.xml") ?: return null
         val rels = zip.getEntry("xl/_rels/workbook.xml.rels") ?: return null
         val relMap = zip.getInputStream(rels).use { parseWorkbookRelationships(it) }
@@ -89,7 +89,7 @@ class XlsxReader(private val context: Context) {
                     val rid = parser.getAttributeValue("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id")
                         ?: parser.getAttributeValue(null, "r:id")
                         ?: parser.getAttributeValue(null, "id")
-                    if (name?.trim() == wantedName.trim()) {
+                    if (wantedName == null || name?.trim() == wantedName.trim()) {
                         resultRid = rid
                         break
                     }
