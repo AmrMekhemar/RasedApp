@@ -41,6 +41,7 @@ fun SortingScreen(
     onStartSorting: () -> Unit,
     onCopyResults: () -> Unit,
     onSaveResults: () -> Unit,
+    onShareResults: () -> Unit,
     onVisibleRow: (Int) -> Unit
 ) {
     SortingTheme {
@@ -85,7 +86,7 @@ fun SortingScreen(
                     }
 
                     if (state.resultCount > 0) {
-                        item { ResultsActions(state.resultCount, state.isExporting, onCopyResults, onSaveResults) }
+                        item { ResultsActions(state.resultCount, state.isExporting, onCopyResults, onSaveResults, onShareResults) }
                         item { SortingResults(state.results, state.resultCount, state.resultStart, onVisibleRow) }
                     }
                 }
@@ -96,7 +97,7 @@ fun SortingScreen(
 
 @Composable
 private fun PreviewSortingScreen(state: SortingUiState) {
-    SortingScreen(state, {}, {}, {}, {}, {}, {}, {}, {}, {})
+    SortingScreen(state, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
 }
 
 @Preview(showBackground = true, locale = "ar", name = "Empty")

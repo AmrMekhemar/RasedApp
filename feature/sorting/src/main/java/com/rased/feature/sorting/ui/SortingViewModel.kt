@@ -5,6 +5,8 @@ import android.net.Uri
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.core.content.FileProvider
+import java.io.File
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.rased.feature.sorting.data.SortingRepository
@@ -132,6 +134,20 @@ class SortingViewModel(application: Application) : AndroidViewModel(application)
 
     fun exportResults(uri: Uri) = withResults { source ->
         repository.exportResults(source, uri)
+    }
+
+    fun shareResults(onReady: (Uri) -> Unit) = withResults { source ->
+        val context = getApplication<Application>()
+        val directory = File(context.cacheDir, "shared_results").apply { mkdirs() }
+        val file = File.createTempFile("Rased-results-", ".xlsx", directory)
+        try {
+            file.outputStream().use { source.writeXlsx(it) }
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.results", file)
+            withContext(Dispatchers.Main) { onReady(uri) }
+        } catch (failure: Exception) {
+            file.delete()
+            throw failure
+        }
     }
 
     private fun withResults(action: suspend (SortingStore) -> Unit) {

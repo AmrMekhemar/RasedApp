@@ -1,6 +1,8 @@
 package com.rased.feature.sorting.ui
 
 import android.content.Context
+import android.content.Intent
+import android.content.ClipData
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -44,6 +46,17 @@ fun SortingRoute(onBack: () -> Unit, viewModel: SortingViewModel = viewModel()) 
         onStartSorting = viewModel::startSorting,
         onCopyResults = viewModel::copyResults,
         onSaveResults = { resultsSaver.launch("Rased-results.xlsx") },
+        onShareResults = {
+            viewModel.shareResults { uri ->
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    clipData = ClipData.newRawUri("نتائج راصد", uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(Intent.createChooser(intent, "مشاركة النتائج Excel"))
+            }
+        },
         onVisibleRow = viewModel::loadVisibleRows
     )
 }
