@@ -9,6 +9,7 @@ data class SortingUiState(
     val dataFileName: String? = null,
     val walletFileName: String? = null,
     val isManagingFiles: Boolean = true,
+    val fileProgress: String? = null,
     val useTextWallet: Boolean = false,
     val walletText: String = "",
     val isLoading: Boolean = false,

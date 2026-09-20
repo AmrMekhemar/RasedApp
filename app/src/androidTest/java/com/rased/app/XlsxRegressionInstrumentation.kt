@@ -13,15 +13,30 @@ import java.util.zip.ZipOutputStream
 /** Dependency-free device regression check; run with adb shell am instrument -w. */
 class XlsxRegressionInstrumentation : Instrumentation() {
     private var persistenceMode: String? = null
+    private var benchmark = false
+    private var roomMode: String? = null
     override fun onCreate(arguments: Bundle?) {
         super.onCreate(arguments)
         persistenceMode = arguments?.getString("persistence")
+        benchmark = arguments?.getString("benchmark") == "sorting"
+        roomMode = arguments?.getString("room")
         start()
     }
 
     override fun onStart() {
         val result = Bundle()
         try {
+            roomMode?.let {
+                RoomSortingRegression(targetContext).run(it == "verify")
+                result.putString("stream", "PASS: Room sorting ($it), migration, aliases, duplicates, replacements, cancellation, exports\n")
+                finish(Activity.RESULT_OK, result)
+                return
+            }
+            if (benchmark) {
+                result.putString("stream", SortingSpeedBenchmark(targetContext).run())
+                finish(Activity.RESULT_OK, result)
+                return
+            }
             persistenceMode?.let { mode ->
                 SavedFilesRegression(targetContext).run(mode == "verify")
                 result.putString("stream", "PASS: persistent files ($mode), independent replacement, failed replacement retention\n")

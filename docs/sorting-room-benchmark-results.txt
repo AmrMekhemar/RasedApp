@@ -1,0 +1,31 @@
+Device=sdk_gphone16k_x86_64; Android=17; debug build; milliseconds
+WARMUP data=1000 wallet=100 compressedBytes=30820
+baseline run=0 total=726 walletReadAndInsert=189 dataReadAndMatch=410 checksum=ccc108f7ca06aaa7f21a18ee81a8fcfef9cf0fa97bdba174537b9a44af6e396b
+oneTimeIndexedImport=304
+cached run=0 total=15 identicalResults=true
+productionRoomImportIncludingDurableCopies=363
+productionRoom run=0 total=16 identicalResults=true
+CASE data=10000 wallet=1000 compressedBytes=284791
+baseline run=0 total=2840 walletReadAndInsert=205 dataReadAndMatch=2545 checksum=da71a959198eb4ecb52348f9b4ff45c64207fed4bacb0550030e6751fe87c7bc
+baseline run=1 total=2845 walletReadAndInsert=192 dataReadAndMatch=2563 checksum=da71a959198eb4ecb52348f9b4ff45c64207fed4bacb0550030e6751fe87c7bc
+baseline run=2 total=2614 walletReadAndInsert=173 dataReadAndMatch=2354 checksum=da71a959198eb4ecb52348f9b4ff45c64207fed4bacb0550030e6751fe87c7bc
+oneTimeIndexedImport=2477
+cached run=0 total=19 identicalResults=true
+cached run=1 total=21 identicalResults=true
+cached run=2 total=19 identicalResults=true
+productionRoomImportIncludingDurableCopies=2444
+productionRoom run=0 total=29 identicalResults=true
+productionRoom run=1 total=17 identicalResults=true
+productionRoom run=2 total=41 identicalResults=true
+CASE data=100000 wallet=10000 compressedBytes=2833637
+baseline run=0 total=25558 walletReadAndInsert=2161 dataReadAndMatch=23203 checksum=ab1c58a03a2d5f9c36615576298977ab76bf6d8583b243b5386ce04362c984f7
+baseline run=1 total=25525 walletReadAndInsert=2039 dataReadAndMatch=23338 checksum=ab1c58a03a2d5f9c36615576298977ab76bf6d8583b243b5386ce04362c984f7
+baseline run=2 total=25297 walletReadAndInsert=2061 dataReadAndMatch=23100 checksum=ab1c58a03a2d5f9c36615576298977ab76bf6d8583b243b5386ce04362c984f7
+oneTimeIndexedImport=23519
+cached run=0 total=38 identicalResults=true
+cached run=1 total=40 identicalResults=true
+cached run=2 total=38 identicalResults=true
+productionRoomImportIncludingDurableCopies=21344
+productionRoom run=0 total=66 identicalResults=true
+productionRoom run=1 total=106 identicalResults=true
+productionRoom run=2 total=81 identicalResults=true

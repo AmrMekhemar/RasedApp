@@ -18,8 +18,10 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelStore
 import com.rased.feature.sorting.data.SortingStore
+import com.rased.feature.sorting.data.SortingRepository
 import com.rased.core.excel.XlsxReader
 import com.rased.feature.sorting.domain.SortingEngine
 import com.rased.feature.sorting.ui.components.ResultsTable
@@ -61,7 +63,12 @@ class LargeSortingRegression(private val instrumentation: Instrumentation) {
             check(workbook.length() > 15_000_000) { "Fixture must exceed 15 MB compressed: ${workbook.length()}" }
             lateinit var model: SortingViewModel
             instrumentation.runOnMainSync {
-                model = ViewModelProvider(owner, ViewModelProvider.AndroidViewModelFactory(context.applicationContext as Application))[SortingViewModel::class.java]
+                model = ViewModelProvider(owner, object : ViewModelProvider.Factory {
+                    @Suppress("UNCHECKED_CAST")
+                    override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                        SortingViewModel(context.applicationContext as Application,
+                            SortingRepository(context, "large.regression")) as T
+                })[SortingViewModel::class.java]
                 model.setDataFile(Uri.fromFile(workbook))
                 model.setWalletFile(Uri.fromFile(walletWorkbook))
             }

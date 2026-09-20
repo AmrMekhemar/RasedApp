@@ -11,6 +11,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.rased.feature.sorting.data.SortingRepository
 import com.rased.feature.sorting.data.SortingStore
+import com.rased.feature.sorting.data.ResultStore
 import com.rased.core.database.SavedFileStorage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,11 +29,13 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.atomic.AtomicBoolean
 
-class SortingViewModel(application: Application) : AndroidViewModel(application) {
-    private val repository = SortingRepository(application)
+class SortingViewModel @JvmOverloads constructor(
+    application: Application,
+    private val repository: SortingRepository = SortingRepository(application)
+) : AndroidViewModel(application) {
     private val _state = MutableStateFlow(SortingUiState())
     val state: StateFlow<SortingUiState> = _state.asStateFlow()
-    private var store: SortingStore? = null
+    private var store: ResultStore? = null
     private val storeMutex = Mutex()
     private var pageJob: Job? = null
     private var requestedStart = 0
@@ -45,8 +48,7 @@ class SortingViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             fileMutex.withLock {
                 try {
-                    val data = savedFiles.get("sorting.data")
-                    val wallet = savedFiles.get("sorting.wallet")
+                    val (data, wallet) = repository.loadInputs(::importProgress)
                     _state.update { it.copy(
                         dataFileUri = data?.let(savedFiles::uri), dataFileName = data?.displayName,
                         walletFileUri = wallet?.let(savedFiles::uri), walletFileName = wallet?.displayName
@@ -77,7 +79,7 @@ class SortingViewModel(application: Application) : AndroidViewModel(application)
             fileMutex.withLock {
                 _state.update { it.copy(isManagingFiles = true) }
                 try {
-                    val saved = savedFiles.replace(if (isData) "sorting.data" else "sorting.wallet", uri)
+                    val saved = repository.replaceInput(uri, isData, ::importProgress)
                     _state.update {
                         if (isData) it.copy(dataFileUri = savedFiles.uri(saved), dataFileName = saved.displayName)
                         else it.copy(walletFileUri = savedFiles.uri(saved), walletFileName = saved.displayName)
@@ -94,7 +96,12 @@ class SortingViewModel(application: Application) : AndroidViewModel(application)
     }
     private fun finishFileOperation() {
         pendingFileOperations--
-        _state.update { it.copy(isManagingFiles = pendingFileOperations > 0) }
+        _state.update { it.copy(isManagingFiles = pendingFileOperations > 0, fileProgress = null) }
+    }
+
+    private fun importProgress(isData: Boolean, rows: Int) {
+        val label = if (isData) "الداتا" else "المحفظة"
+        _state.update { it.copy(fileProgress = "جاري استيراد $label: $rows صف") }
     }
 
     fun setUseTextWallet(value: Boolean) = _state.update { it.copy(useTextWallet = value, message = null) }
@@ -122,14 +129,13 @@ class SortingViewModel(application: Application) : AndroidViewModel(application)
         requestedStart = 0
         _state.update { it.copy(isLoading = true, results = emptyList(), resultCount = 0, resultStart = 0, message = null) }
         viewModelScope.launch(Dispatchers.IO) {
-            var pending: SortingStore? = null
+            var pending: ResultStore? = null
             try {
                 storeMutex.withLock {
                     store?.close()
                     store = null
                 }
                 val completed = repository.sort(
-                    dataUri, current.walletFileUri,
                     current.walletText.takeIf { current.useTextWallet }
                 )
                 val next = completed.store
@@ -208,7 +214,7 @@ class SortingViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    private fun withResults(action: suspend (SortingStore) -> Unit) {
+    private fun withResults(action: suspend (ResultStore) -> Unit) {
         if (_state.value.isLoading || _state.value.isExporting) return
         _state.update { it.copy(isExporting = true, message = null) }
         viewModelScope.launch(Dispatchers.IO) {

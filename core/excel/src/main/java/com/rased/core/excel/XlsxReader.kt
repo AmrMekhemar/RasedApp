@@ -8,6 +8,8 @@ import java.io.File
 import java.io.InputStream
 import java.io.Closeable
 import java.io.RandomAccessFile
+import java.io.DataOutputStream
+import java.nio.ByteBuffer
 import java.util.zip.ZipFile
 
 class XlsxReader(private val context: Context) {
@@ -30,33 +32,56 @@ class XlsxReader(private val context: Context) {
         sheetName: String?,
         headerAliases: Set<String>,
         onRow: (Map<String, String>) -> Unit
+    ) = forEachSelectedRow(uri, sheetName, headerAliases, null, {}, onRow)
+
+    fun forEachSelectedRow(
+        uri: Uri,
+        sheetName: String?,
+        headerAliases: Set<String>,
+        selectedHeaders: Set<String>?,
+        checkActive: () -> Unit,
+        onRow: (Map<String, String>) -> Unit
     ) {
-        // A content URI need not be seekable. Spool the compressed archive to disk,
-        // then stream only the workbook metadata and the requested worksheet.
-        val file = File.createTempFile("xlsx-", ".zip", context.cacheDir)
+        // Private file URIs are seekable already. Only spool external content providers.
+        val temporary = uri.scheme != "file"
+        val file = if (temporary) File.createTempFile("xlsx-", ".zip", context.cacheDir)
+            else File(requireNotNull(uri.path))
         try {
-            context.contentResolver.openInputStream(uri).use { input ->
+            checkActive()
+            if (temporary) context.contentResolver.openInputStream(uri).use { input ->
                 requireNotNull(input) { "تعذر فتح ملف Excel" }
-                file.outputStream().use { input.copyTo(it) }
+                file.outputStream().use { output ->
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    while (true) {
+                        checkActive()
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        output.write(buffer, 0, count)
+                    }
+                }
             }
             ZipFile(file).use { zip ->
                 val target = findSheetTarget(zip, sheetName)
                     ?: error(if (sheetName == null) "لم يتم العثور على أول شيت في الملف" else "لم يتم العثور على شيت باسم \"$sheetName\"")
                 SharedStrings(context.cacheDir).use { sharedStrings ->
                     zip.getEntry("xl/sharedStrings.xml")?.let { entry ->
-                        zip.getInputStream(entry).use { parseSharedStrings(it, sharedStrings) }
+                        zip.getInputStream(entry).use { parseSharedStrings(it, sharedStrings, checkActive) }
                     }
+                    sharedStrings.finishWriting()
                     val entry = zip.getEntry(target) ?: error("تعذر قراءة الشيت المطلوب")
                     val aliases = headerAliases.map(::normalizeHeader).toSet()
+                    val selected = selectedHeaders?.map(::normalizeHeader)?.toSet()
                     var headers: Map<Int, String>? = null
                     var rowCount = 0
                     zip.getInputStream(entry).use { input ->
-                        parseSheet(input, sharedStrings) { row ->
+                        parseSheet(input, sharedStrings, { column -> headers?.containsKey(column) != false }, checkActive) { row ->
                             rowCount++
                             val currentHeaders = headers
                             if (currentHeaders == null) {
                                 if (rowCount <= 25 && row.values.any { normalizeHeader(it) in aliases }) {
-                                    headers = row.mapValues { it.value.trim() }.filterValues { it.isNotBlank() }
+                                    headers = row.mapValues { it.value.trim() }.filterValues {
+                                        it.isNotBlank() && (selected == null || normalizeHeader(it) in selected)
+                                    }
                                 } else if (rowCount >= 25) {
                                     error("لم يتم العثور على صف العناوين أو عمود اللوحة")
                                 }
@@ -71,7 +96,7 @@ class XlsxReader(private val context: Context) {
                 }
             }
         } finally {
-            file.delete()
+            if (temporary) file.delete()
         }
     }
 
@@ -119,7 +144,7 @@ class XlsxReader(private val context: Context) {
         return if (clean.startsWith("xl/")) clean else "xl/$clean"
     }
 
-    private fun parseSharedStrings(input: InputStream, strings: SharedStrings) {
+    private fun parseSharedStrings(input: InputStream, strings: SharedStrings, checkActive: () -> Unit) {
         val parser = newParser(input)
         var inSi = false
         val builder = StringBuilder()
@@ -136,6 +161,7 @@ class XlsxReader(private val context: Context) {
                 }
                 XmlPullParser.END_TAG -> {
                     if (parser.name.endsWith("si")) {
+                        checkActive()
                         strings.add(builder.toString())
                         inSi = false
                     }
@@ -144,7 +170,8 @@ class XlsxReader(private val context: Context) {
         }
     }
 
-    private fun parseSheet(input: InputStream, sharedStrings: SharedStrings, onRow: (Map<Int, String>) -> Unit) {
+    private fun parseSheet(input: InputStream, sharedStrings: SharedStrings,
+        selectedColumn: (Int) -> Boolean, checkActive: () -> Unit, onRow: (Map<Int, String>) -> Unit) {
         val currentRow = linkedMapOf<Int, String>()
         val parser = newParser(input)
 
@@ -155,7 +182,7 @@ class XlsxReader(private val context: Context) {
         while (parser.next() != XmlPullParser.END_DOCUMENT) {
             when (parser.eventType) {
                 XmlPullParser.START_TAG -> when (parser.name.substringAfter(':')) {
-                    "row" -> currentRow.clear()
+                    "row" -> { checkActive(); currentRow.clear() }
                     "c" -> {
                         val ref = parser.getAttributeValue(null, "r").orEmpty()
                         currentColumn = columnIndexFromCellRef(ref)
@@ -163,6 +190,7 @@ class XlsxReader(private val context: Context) {
                         inlineText = null
                     }
                     "v" -> {
+                        if (!selectedColumn(currentColumn)) continue
                         val value = parser.nextText().trim()
                         val resolved = when (currentType) {
                             "s" -> value.toIntOrNull()?.let { sharedStrings.getOrNull(it) }.orEmpty()
@@ -171,7 +199,7 @@ class XlsxReader(private val context: Context) {
                         if (currentColumn >= 0 && resolved.isNotBlank()) currentRow[currentColumn] = resolved
                     }
                     "t" -> {
-                        if (currentType == "inlineStr") inlineText = parser.nextText().trim()
+                        if (currentType == "inlineStr" && selectedColumn(currentColumn)) inlineText = parser.nextText().trim()
                     }
                 }
                 XmlPullParser.END_TAG -> when (parser.name.substringAfter(':')) {
@@ -189,34 +217,64 @@ class XlsxReader(private val context: Context) {
     private class SharedStrings(cacheDir: File) : Closeable {
         private val textFile = File.createTempFile("xlsx-text-", ".tmp", cacheDir)
         private val indexFile = File.createTempFile("xlsx-index-", ".tmp", cacheDir)
-        private val text = RandomAccessFile(textFile, "rw")
-        private val index = RandomAccessFile(indexFile, "rw")
+        private val textOutput = DataOutputStream(textFile.outputStream().buffered(64 * 1024))
+        private val indexOutput = DataOutputStream(indexFile.outputStream().buffered(64 * 1024))
+        private val text = RandomAccessFile(textFile, "r")
+        private val index = RandomAccessFile(indexFile, "r")
+        private var textOffset = 0L
+        private val offsetBuffer = ByteArray(8)
+        private val lengthBuffer = ByteArray(4)
+        private var writing = true
         private var count = 0
-        private val cache = object : LinkedHashMap<Int, String>(256, 0.75f, true) {
-            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Int, String>?): Boolean = size > 256
-        }
+        private val cache = LinkedHashMap<Int, String>(256, 0.75f, true)
+        private var cacheBytes = 0
 
         fun add(value: String) {
             val bytes = value.toByteArray(Charsets.UTF_8)
-            index.writeLong(text.filePointer)
-            text.writeInt(bytes.size)
-            text.write(bytes)
+            indexOutput.writeLong(textOffset)
+            textOutput.writeInt(bytes.size)
+            textOutput.write(bytes)
+            textOffset += 4 + bytes.size.toLong()
+            cacheValue(count, value)
             count++
+        }
+
+        fun finishWriting() {
+            if (writing) {
+                textOutput.close()
+                indexOutput.close()
+                writing = false
+            }
+        }
+
+        private fun cacheValue(position: Int, value: String) {
+            val cost = value.length * 2 + 128
+            if (cost > 4 * 1024 * 1024) return
+            cache[position] = value
+            cacheBytes += cost
+            while (cacheBytes > 4 * 1024 * 1024 || cache.size > 8192) {
+                val iterator = cache.entries.iterator()
+                val oldest = iterator.next()
+                cacheBytes -= oldest.value.length * 2 + 128
+                iterator.remove()
+            }
         }
 
         fun getOrNull(position: Int): String? {
             if (position !in 0 until count) return null
             cache[position]?.let { return it }
             index.seek(position.toLong() * 8)
-            text.seek(index.readLong())
-            val bytes = ByteArray(text.readInt())
+            index.readFully(offsetBuffer)
+            text.seek(ByteBuffer.wrap(offsetBuffer).long)
+            text.readFully(lengthBuffer)
+            val bytes = ByteArray(ByteBuffer.wrap(lengthBuffer).int)
             text.readFully(bytes)
-            return bytes.toString(Charsets.UTF_8).also { cache[position] = it }
+            return bytes.toString(Charsets.UTF_8).also { cacheValue(position, it) }
         }
 
         override fun close() {
             try {
-                text.close()
+                try { finishWriting() } finally { text.close() }
             } finally {
                 try {
                     index.close()

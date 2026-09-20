@@ -1,13 +1,14 @@
 package com.rased.feature.sorting.domain
 
 object PlateNormalizer {
+    private val whitespace = "\\s+".toRegex()
     fun normalize(input: String?): String? {
         if (input.isNullOrBlank()) return null
 
         val cleaned = input
             .trim()
             .replace("\u00A0", "")
-            .replace("\\s+".toRegex(), "")
+            .replace(whitespace, "")
             .replace("أ", "ا")
             .replace("إ", "ا")
             .replace("آ", "ا")

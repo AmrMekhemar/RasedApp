@@ -13,7 +13,7 @@ import java.io.Writer
 import java.io.OutputStream
 
 /** Each sort owns a disposable database. No workbook-sized JVM collections. */
-class SortingStore(cacheDir: File) : Closeable {
+class SortingStore(cacheDir: File) : ResultStore {
     private val file = File.createTempFile("sorting-", ".db", cacheDir)
     private val db = SQLiteDatabase.openOrCreateDatabase(file, null)
     private val walletInsert: SQLiteStatement
@@ -71,7 +71,7 @@ class SortingStore(cacheDir: File) : Closeable {
     }
 
     @Synchronized
-    fun readPage(start: Int, count: Int): List<SortingResult> {
+    override fun readPage(start: Int, count: Int): List<SortingResult> {
         check(!closed)
         return db.rawQuery("SELECT plate,type,note,street,district,date,walletType FROM results WHERE id > ? ORDER BY id LIMIT ?", arrayOf(start.toString(), count.toString())).use { cursor ->
             buildList { while (cursor.moveToNext()) add(cursor.result()) }
@@ -79,7 +79,7 @@ class SortingStore(cacheDir: File) : Closeable {
     }
 
     @Synchronized
-    fun copyText(): String {
+    override fun copyText(): String {
         val text = StringBuilder(TSV_HEADER).append('\n')
         forEachResult { result ->
             val row = result.toTsvRow()
@@ -97,7 +97,7 @@ class SortingStore(cacheDir: File) : Closeable {
     }
 
     @Synchronized
-    fun writeXlsx(output: OutputStream) {
+    override fun writeXlsx(output: OutputStream) {
         XlsxWriter.write(output, TSV_HEADER.split('\t')) { writeRow ->
             forEachResult { result ->
                 writeRow(listOf(result.plate, result.type, result.note, result.street, result.district, result.date, result.walletType))

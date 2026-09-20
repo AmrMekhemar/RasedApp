@@ -21,7 +21,11 @@ class SavedFileStorage(context: Context) {
 
     fun uri(file: SavedFile): Uri = Uri.fromFile(File(directory, file.fileName))
 
-    suspend fun replace(slot: String, source: Uri): SavedFile = withContext(Dispatchers.IO) {
+    suspend fun replace(
+        slot: String,
+        source: Uri,
+        beforeCommit: (SavedFile, Uri) -> Unit = { _, _ -> }
+    ): SavedFile = withContext(Dispatchers.IO) {
         replacementMutex.withLock {
             check(directory.isDirectory || directory.mkdirs()) { "تعذر إنشاء مجلد الملفات" }
             val previous = dao.get(slot)
@@ -49,7 +53,11 @@ class SavedFileStorage(context: Context) {
                 job.ensureActive()
                 val saved = SavedFile(slot, file.name, displayName, file.length())
                 // Commit only after the entire copy is durable. A failed copy keeps the old selection.
-                dao.upsert(saved)
+                RasedDatabase.getInstance(context).runInTransaction {
+                    beforeCommit(saved, uri(saved))
+                    job.ensureActive()
+                    dao.upsert(saved)
+                }
                 committed = true
                 previous?.let { File(directory, it.fileName).delete() }
                 saved
