@@ -27,6 +27,12 @@ class XlsxRegressionInstrumentation : Instrumentation() {
         val result = Bundle()
         try {
             roomMode?.let {
+                if (it == "links") {
+                    HyperlinkRegression(targetContext).run()
+                    result.putString("stream", "PASS: embedded hyperlinks, HYPERLINK formulas, direct URLs, repository import, open intent\n")
+                    finish(Activity.RESULT_OK, result)
+                    return
+                }
                 RoomSortingRegression(targetContext).run(it == "verify")
                 result.putString("stream", "PASS: Room sorting ($it), migration, aliases, duplicates, replacements, cancellation, exports\n")
                 finish(Activity.RESULT_OK, result)

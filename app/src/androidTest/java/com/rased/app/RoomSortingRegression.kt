@@ -25,16 +25,16 @@ class RoomSortingRegression(private val context: Context) {
             val source = File.createTempFile("room-source-", ".xlsx", context.cacheDir)
             val export = File.createTempFile("room-export-", ".xlsx", context.cacheDir)
             try {
-                write(source, listOf(" لوحه ", "النوع", " ملاحظة ", "شارع", "حى", "تاريخ"), listOf(
-                    listOf("أ ب ج ١٢٣٤", "car", "first", "Nile", "Cairo", "2026-09-19"),
+                write(source, listOf(" لوحه ", "النوع", " ملاحظة ", "شارع", "حى", "تاريخ", " الموقع "), listOf(
+                    listOf("أ ب ج ١٢٣٤", "car", "first", "Nile", "Cairo", "2026-09-19", "data-location"),
                     listOf("ابج1234", "duplicate", "wrong", "", "", ""),
                     listOf("دهو5678", "bus", "second", "Sea", "Alex", "2026-09-18"),
                     listOf("invalid", "invalid", "ignored", "", "", "")
                 ))
                 // Emulate the pre-upgrade metadata-only file: loadInputs must import it once.
                 files.replace("room.regression.data", Uri.fromFile(source))
-                write(source, listOf("لوحة", "الموديل"), listOf(
-                    listOf("د ه و ٥٦٧٨", "wallet-first"), listOf("ابج1234", "wallet-second"),
+                write(source, listOf("لوحة", "الموديل", "الموقع"), listOf(
+                    listOf("د ه و ٥٦٧٨", "wallet-first", "wallet-location"), listOf("ابج1234", "wallet-second", "ignored-location"),
                     listOf("دهو5678", "wrong"), listOf("زحط9999", "missing")
                 ))
                 repository.replaceInput(Uri.fromFile(source), false)
@@ -51,12 +51,15 @@ class RoomSortingRegression(private val context: Context) {
                     val expected = snapshot.readPage(0, 100)
                     check(expected.map { it.note } == listOf("second", "first"))
                     check(expected.map { it.walletType } == listOf("wallet-first", "wallet-second"))
+                    check(expected.map { it.location } == listOf("wallet-location", "data-location"))
+                    check(snapshot.copyText().contains("الموقع"))
                     check(expected[1].plate == "أ ب ج ١٢٣٤")
                     check(snapshot.readPage(1, 1) == expected.drop(1))
                     check(snapshot.readPage(2, 100).isEmpty())
                     check(snapshot.copyText().contains("first"))
                     export.outputStream().use(snapshot::writeXlsx)
                     val exported = XlsxReader(context).readSheet(Uri.fromFile(export), null, SortingEngine.plateNames())
+                    check(exported.map { it["الموقع"] } == listOf("wallet-location", "data-location"))
                     check(exported.map { it["الملاحظة"] } == listOf("second", "first"))
                     check(exported.map { it["نوع المحفظة"] } == listOf("wallet-first", "wallet-second"))
 
@@ -79,6 +82,7 @@ class RoomSortingRegression(private val context: Context) {
                     repository.sort("ابج1234\nأ ب ج ١٢٣٤\nدهو5678").store.use {
                         check(it.readPage(0, 100).map { row -> row.note } == listOf("first", "second"))
                         check(it.readPage(0, 100).all { row -> row.walletType == null })
+                        check(it.readPage(0, 100).map { row -> row.location } == listOf("data-location", null))
                     }
                     check(files.get("room.regression.wallet") == walletSaved)
                     check(dao.imported("room.regression.wallet") == walletRevision)
@@ -130,7 +134,7 @@ class RoomSortingRegression(private val context: Context) {
             try {
                 check(migrated.savedFiles().get("sorting.data")!!.displayName == "Original.xlsx")
                 check(migrated.sorting().imported("sorting.data") == null)
-                check(migrated.openHelper.readableDatabase.version == 2)
+                check(migrated.openHelper.readableDatabase.version == 3)
             } finally { migrated.close() }
         } finally { context.deleteDatabase(name) }
     }

@@ -73,8 +73,12 @@ class XlsxReader(private val context: Context) {
                     val selected = selectedHeaders?.map(::normalizeHeader)?.toSet()
                     var headers: Map<Int, String>? = null
                     var rowCount = 0
+                    SheetHyperlinks(context.cacheDir).use { links ->
+                    links.load(zip, target, checkActive)
                     zip.getInputStream(entry).use { input ->
-                        parseSheet(input, sharedStrings, { column -> headers?.containsKey(column) != false }, checkActive) { row ->
+                        parseSheet(input, sharedStrings, { column -> headers?.containsKey(column) != false },
+                            { column -> headers?.get(column)?.let(::normalizeHeader) in setOf("الموقع", "موقع") },
+                            links::target, checkActive) { row ->
                             rowCount++
                             val currentHeaders = headers
                             if (currentHeaders == null) {
@@ -91,6 +95,7 @@ class XlsxReader(private val context: Context) {
                                 if (mapped.values.any { it.isNotBlank() }) onRow(mapped)
                             }
                         }
+                    }
                     }
                     if (headers == null) error("لم يتم العثور على صف العناوين أو عمود اللوحة")
                 }
@@ -171,13 +176,16 @@ class XlsxReader(private val context: Context) {
     }
 
     private fun parseSheet(input: InputStream, sharedStrings: SharedStrings,
-        selectedColumn: (Int) -> Boolean, checkActive: () -> Unit, onRow: (Map<Int, String>) -> Unit) {
+        selectedColumn: (Int) -> Boolean, hyperlinkColumn: (Int) -> Boolean,
+        hyperlinkTarget: (String) -> String?, checkActive: () -> Unit, onRow: (Map<Int, String>) -> Unit) {
         val currentRow = linkedMapOf<Int, String>()
         val parser = newParser(input)
 
         var currentColumn = -1
         var currentType: String? = null
         var inlineText: String? = null
+        var currentRef = ""
+        var formulaTarget: String? = null
 
         while (parser.next() != XmlPullParser.END_DOCUMENT) {
             when (parser.eventType) {
@@ -185,9 +193,18 @@ class XlsxReader(private val context: Context) {
                     "row" -> { checkActive(); currentRow.clear() }
                     "c" -> {
                         val ref = parser.getAttributeValue(null, "r").orEmpty()
+                        currentRef = ref
+                        formulaTarget = null
                         currentColumn = columnIndexFromCellRef(ref)
                         currentType = parser.getAttributeValue(null, "t")
                         inlineText = null
+                    }
+                    "f" -> {
+                        if (hyperlinkColumn(currentColumn)) {
+                            val formula = parser.nextText()
+                            formulaTarget = Regex("""^\s*=?\s*(?:_xlfn\.)?HYPERLINK\s*\(\s*"((?:[^"]|"")*)"\s*[,;)]""", RegexOption.IGNORE_CASE)
+                                .find(formula)?.groupValues?.get(1)?.replace("\"\"", "\"")
+                        }
                     }
                     "v" -> {
                         if (!selectedColumn(currentColumn)) continue
@@ -205,6 +222,11 @@ class XlsxReader(private val context: Context) {
                 XmlPullParser.END_TAG -> when (parser.name.substringAfter(':')) {
                     "c" -> {
                         if (currentColumn >= 0 && !inlineText.isNullOrBlank()) currentRow[currentColumn] = inlineText.orEmpty()
+                        if (hyperlinkColumn(currentColumn)) {
+                            (hyperlinkTarget(currentRef) ?: formulaTarget)?.takeIf { it.isNotBlank() }?.let {
+                                currentRow[currentColumn] = it
+                            }
+                        }
                     }
                     "row" -> onRow(currentRow)
                 }

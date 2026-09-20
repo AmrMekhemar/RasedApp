@@ -44,7 +44,8 @@ private val resultColumns = listOf(
     ResultColumn("الشارع", 180.dp) { it.street },
     ResultColumn("الحي", 160.dp) { it.district },
     ResultColumn("التاريخ", 180.dp) { it.date },
-    ResultColumn("نوع المحفظة", 180.dp) { it.walletType }
+    ResultColumn("نوع المحفظة", 180.dp) { it.walletType },
+    ResultColumn("الموقع", 220.dp) { it.location }
 )
 
 @Composable
@@ -96,7 +97,12 @@ private fun ResultCard(result: SortingResult, index: Int) {
         )
     ) {
         resultColumns.forEachIndexed { columnIndex, column ->
-            ResultCell(column.value(result).orEmpty(), column.width, bold = columnIndex == 0)
+            if (column.title == "الموقع") {
+                Box(Modifier.width(column.width).height(48.dp)
+                    .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant), contentAlignment = Alignment.CenterStart) {
+                    LocationLink(result.location, Modifier.fillMaxWidth().padding(12.dp), showLabel = false)
+                }
+            } else ResultCell(column.value(result).orEmpty(), column.width, bold = columnIndex == 0)
         }
     }
 }

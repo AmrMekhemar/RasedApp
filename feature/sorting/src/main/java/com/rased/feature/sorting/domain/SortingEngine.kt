@@ -4,6 +4,8 @@ object SortingEngine {
     private val plateColumnNames = setOf("اللوحة", "اللوحه", "لوحة", "لوحه")
     private val walletTypeNames = setOf("النوع", "الماركة", "الموديل")
 
+    fun locationNames(): Set<String> = setOf("الموقع", "موقع")
+
     fun plateNames(): Set<String> = plateColumnNames
     fun walletTypeNames(): Set<String> = walletTypeNames
 
@@ -36,7 +38,8 @@ object SortingEngine {
                 street = firstValueOrNull(dataRow, listOf("الشارع", "شارع")),
                 district = firstValueOrNull(dataRow, listOf("الحي", "حى")),
                 date = firstValueOrNull(dataRow, listOf("التاريخ", "تاريخ")),
-                walletType = walletTypeHeader?.let { walletRow[it].orEmpty().ifBlank { null } }
+                walletType = walletTypeHeader?.let { walletRow[it].orEmpty().ifBlank { null } },
+                location = firstValueOrNull(dataRow, locationNames().toList()) ?: firstValueOrNull(walletRow, locationNames().toList())
             )
         }
 
@@ -53,7 +56,7 @@ object SortingEngine {
     }
 
     fun resultsToTsv(results: List<SortingResult>): String {
-        val header = listOf("اللوحة", "النوع", "الملاحظة", "الشارع", "الحي", "التاريخ", "نوع المحفظة").joinToString("\t")
+        val header = listOf("اللوحة", "النوع", "الملاحظة", "الشارع", "الحي", "التاريخ", "نوع المحفظة", "الموقع").joinToString("\t")
         return buildString {
             appendLine(header)
             results.forEach { appendLine(it.toTsvRow()) }

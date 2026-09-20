@@ -59,6 +59,7 @@ internal fun SortingResultCard(result: SortingResult) {
             ResultCardHeader(result, expanded)
             ResultChipRow(result)
             LocationChip(result.street)
+            LocationLink(result.location, Modifier.fillMaxWidth().padding(vertical = 8.dp))
             ResultChipRow(ResultChipData("التاريخ", result.date ?: "—"))
             if (expanded) ExpandedResultDetails(result)
             else Text("اضغط لعرض تفاصيل الحالة", color = CardText.copy(alpha = .7f),
@@ -107,6 +108,7 @@ private fun SortingResult.cardDetails(): String = listOf(
     "النوع" to type,
     "الحي" to district,
     "الشارع" to street,
+    "الموقع" to location,
     "التاريخ" to date,
     "نوع المحفظة" to walletType,
     "الملاحظة" to note
@@ -149,6 +151,7 @@ private fun LocationChip(street: String?) {
 private fun ExpandedResultDetails(result: SortingResult) {
     HorizontalDivider(color = CardBorder)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 2.dp)) {
+        LocationLink(result.location, Modifier.fillMaxWidth(), maxLines = Int.MAX_VALUE)
         DetailLine("نوع المحفظة", result.walletType)
         DetailLine("الملاحظة", result.note)
         Text("اضغط للطي", color = CardText.copy(alpha = .72f),

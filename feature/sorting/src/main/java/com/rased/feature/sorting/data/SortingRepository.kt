@@ -62,7 +62,7 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
         val walletBatch = ArrayList<IndexedWalletRow>(64)
         var keys: List<String?>? = null
         var sequence = 0L
-        val aliases = if (isData) DATA_COLUMNS else listOf(SortingEngine.plateNames(), SortingEngine.walletTypeNames())
+        val aliases = if (isData) DATA_COLUMNS else listOf(SortingEngine.plateNames(), SortingEngine.walletTypeNames(), SortingEngine.locationNames())
         progress(isData, 0)
         reader.forEachSelectedRow(files.uri(saved), null, SortingEngine.plateNames(), aliases.flatten().toSet(), checkActive) { row ->
             checkActive()
@@ -71,8 +71,8 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
             val plate = values[0]
             val normalized = PlateNormalizer.normalize(plate)
             if (normalized != null) {
-                if (isData) dataBatch += IndexedDataRow(revision, normalized, plate!!, values[1], values[2], values[3], values[4], values[5])
-                else walletBatch += IndexedWalletRow(revision, normalized, sequence, values[1])
+                if (isData) dataBatch += IndexedDataRow(revision, normalized, plate!!, values[1], values[2], values[3], values[4], values[5], values[6])
+                else walletBatch += IndexedWalletRow(revision, normalized, sequence, values[1], values[2])
             }
             sequence++
             if (dataBatch.size >= 64) { dao.insertData(dataBatch); dataBatch.clear() }
@@ -141,9 +141,9 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
 
     private companion object {
         val operationMutex = Mutex()
-        const val PARSER_VERSION = 1
+        const val PARSER_VERSION = 3
         val DATA_COLUMNS = listOf(SortingEngine.plateNames(), setOf("النوع"), setOf("الملاحظة", "ملاحظة", "الملاحظات"),
-            setOf("الشارع", "شارع"), setOf("الحي", "حى"), setOf("التاريخ", "تاريخ"))
+            setOf("الشارع", "شارع"), setOf("الحي", "حى"), setOf("التاريخ", "تاريخ"), SortingEngine.locationNames())
         fun normalizeHeader(value: String) = value.trim().replace(" ", "")
     }
 }
