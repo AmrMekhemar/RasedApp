@@ -1,9 +1,4 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="48dp"
-    android:height="48dp"
-    android:viewportWidth="48"
-    android:viewportHeight="48">
-    <path android:fillColor="#FFFFFF" android:pathData="M0,0h48v48h-48z" />
-    <path android:fillColor="#111111" android:pathData="M24,4L44,24L24,44L4,24z" />
-    <path android:fillColor="#FFFFFF" android:pathData="M14,22h20v4h-20zM22,14h4v20h-4z" />
-</vector>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>
