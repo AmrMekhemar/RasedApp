@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.rased.core.ui.RasedTheme
+import com.rased.app.BuildConfig
 
 @Composable
 fun HomeScreen(onOpenSorting: () -> Unit, onOpenUnloading: () -> Unit, onOpenChecking: () -> Unit) {
@@ -48,8 +49,14 @@ fun HomeScreen(onOpenSorting: () -> Unit, onOpenUnloading: () -> Unit, onOpenChe
                     FeatureCard("التشييك", "مساحة مخصصة لمراجعة اللوحات.",
                         FeatureSymbol.Checking, HomeStyle.Amber, onOpenChecking, comingSoon = true)
                 }
-                Text("راصد · كل التفاصيل في مكان واحد", modifier = Modifier.align(Alignment.CenterHorizontally),
-                    color = HomeStyle.Muted, style = MaterialTheme.typography.labelMedium)
+                Column(modifier = Modifier.align(Alignment.CenterHorizontally),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("راصد · كل التفاصيل في مكان واحد",
+                        color = HomeStyle.Muted, style = MaterialTheme.typography.labelMedium)
+                    Text("الإصدار ${BuildConfig.VERSION_NAME}",
+                        color = HomeStyle.Muted, style = MaterialTheme.typography.labelSmall)
+                }
             }
         }
     }
