@@ -58,6 +58,7 @@ internal fun SortingResultCard(result: SortingResult) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
             ResultCardHeader(result, expanded)
             ResultChipRow(result)
+            ResultChipRow(ResultChipData("الحي", result.district ?: "—"))
             LocationChip(result.street)
             LocationLink(result.location, Modifier.fillMaxWidth().padding(vertical = 8.dp))
             ResultChipRow(ResultChipData("التاريخ", result.date ?: "—"))
@@ -118,9 +119,9 @@ private data class ResultChipData(val label: String, val value: String)
 
 @Composable
 private fun ResultChipRow(result: SortingResult) {
-    val chips = listOf(ResultChipData("النوع", result.type ?: "—"), ResultChipData("الحي", result.district ?: "—"))
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp, Alignment.Start)) {
-        chips.forEach { ResultChip(it) }
+        ResultChip(ResultChipData("النوع", result.type ?: "—"), Modifier.weight(1f))
+        ResultChip(ResultChipData("موديل السيارة", result.walletType ?: "—"), Modifier.weight(1.6f))
     }
 }
 
@@ -130,10 +131,10 @@ private fun ResultChipRow(chip: ResultChipData) {
 }
 
 @Composable
-private fun ResultChip(chip: ResultChipData) {
+private fun ResultChip(chip: ResultChipData, modifier: Modifier = Modifier) {
     Text("${chip.label}: ${chip.value}", color = CardText, maxLines = 1, overflow = TextOverflow.Ellipsis,
         style = MaterialTheme.typography.bodySmall,
-        modifier = Modifier.background(Color(0xFFF4F5F5), RoundedCornerShape(9.dp))
+        modifier = modifier.background(Color(0xFFF4F5F5), RoundedCornerShape(9.dp))
             .padding(horizontal = 11.dp, vertical = 7.dp))
 }
 
@@ -152,7 +153,7 @@ private fun ExpandedResultDetails(result: SortingResult) {
     HorizontalDivider(color = CardBorder)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 2.dp)) {
         LocationLink(result.location, Modifier.fillMaxWidth(), maxLines = Int.MAX_VALUE)
-        DetailLine("نوع المحفظة", result.walletType)
+        DetailLine("موديل السيارة", result.walletType)
         DetailLine("الملاحظة", result.note)
         Text("اضغط للطي", color = CardText.copy(alpha = .72f),
             style = MaterialTheme.typography.labelSmall, modifier = Modifier.align(Alignment.Start))
