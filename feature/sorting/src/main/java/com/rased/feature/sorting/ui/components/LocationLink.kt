@@ -14,6 +14,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.Alignment
 
 object LocationLinks {
     fun uri(value: String?): Uri? {
@@ -38,19 +40,23 @@ object LocationLinks {
 }
 
 @Composable
-internal fun LocationLink(value: String?, modifier: Modifier = Modifier, showLabel: Boolean = true, maxLines: Int = 1) {
+internal fun LocationLink(value: String?, modifier: Modifier = Modifier, showLabel: Boolean = true, maxLines: Int = 1, compact: Boolean = false) {
     val context = LocalContext.current
     val uri = LocationLinks.uri(value)
     val text = value?.takeIf { it.isNotBlank() } ?: "—"
-    Text(
-        text = if (showLabel) "الموقع: $text" else text,
+    Box(
         modifier = if (uri == null) modifier else modifier.clickable(role = Role.Button, onClickLabel = "فتح الموقع") {
             LocationLinks.open(context, uri)
         },
+        contentAlignment = Alignment.CenterStart
+    ) {
+    Text(
+        text = if (compact && uri != null) "فتح الموقع ↗" else if (showLabel) "الموقع: $text" else text,
         color = if (uri == null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.primary,
         textDecoration = if (uri == null) null else TextDecoration.Underline,
-        style = MaterialTheme.typography.bodyMedium,
+        style = if (compact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
         maxLines = maxLines,
         overflow = TextOverflow.Ellipsis
     )
+    }
 }
