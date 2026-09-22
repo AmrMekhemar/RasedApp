@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -12,6 +13,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -19,6 +24,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -40,29 +47,46 @@ private val CardGreen = Color(0xFF00976D)
 internal fun SortingResultCard(result: SortingResult) {
     val hasAddress = !result.district.isNullOrBlank() || !result.street.isNullOrBlank()
     val hasFooter = !result.date.isNullOrBlank() || !result.location.isNullOrBlank()
+    val hasDetails = hasAddress || hasFooter || !result.note.isNullOrBlank()
+    var expanded by rememberSaveable(result) { mutableStateOf(false) }
     Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(15.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)) {
         Column(Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)) {
             ResultCardHeader(result)
-            if (hasAddress) {
+            if (hasDetails) {
                 HorizontalDivider(color = CardLine)
-                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    if (!result.district.isNullOrBlank())
-                        AddressField("الحي", result.district, R.drawable.ic_result_pin, Modifier.weight(1f))
-                    if (!result.district.isNullOrBlank() && !result.street.isNullOrBlank()) SectionDivider()
-                    if (!result.street.isNullOrBlank())
-                        AddressField("الشارع", result.street, R.drawable.ic_result_road, Modifier.weight(1f))
+                TextButton(
+                    onClick = { expanded = !expanded },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).semantics {
+                        stateDescription = if (expanded) "موسّع" else "مطوي"
+                    },
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                ) {
+                    Text(if (expanded) "إخفاء التفاصيل" else "عرض التفاصيل")
                 }
-            }
-            if (hasFooter) ResultCardFooter(result)
-            if (!result.note.isNullOrBlank()) {
-                Text(buildAnnotatedString {
-                    withStyle(SpanStyle(color = CardMuted)) { append("الملاحظة: ") }
-                    append(result.note)
-                }, color = CardInk, style = MaterialTheme.typography.bodySmall)
+                AnimatedVisibility(visible = expanded) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (hasAddress) {
+                            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                if (!result.district.isNullOrBlank())
+                                    AddressField("الحي", result.district, R.drawable.ic_result_pin, Modifier.weight(1f))
+                                if (!result.district.isNullOrBlank() && !result.street.isNullOrBlank()) SectionDivider()
+                                if (!result.street.isNullOrBlank())
+                                    AddressField("الشارع", result.street, R.drawable.ic_result_road, Modifier.weight(1f))
+                            }
+                        }
+                        if (hasFooter) ResultCardFooter(result)
+                        if (!result.note.isNullOrBlank()) {
+                            Text(buildAnnotatedString {
+                                withStyle(SpanStyle(color = CardMuted)) { append("الملاحظة: ") }
+                                append(result.note)
+                            }, color = CardInk, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
             }
         }
     }
