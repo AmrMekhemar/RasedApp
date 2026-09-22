@@ -13,6 +13,7 @@ import com.rased.feature.sorting.domain.PlateNormalizer
 import com.rased.feature.sorting.domain.SortingEngine
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -27,16 +28,30 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
     private val database get() = RasedDatabase.getInstance(context)
     private val dao get() = database.sorting()
 
-    suspend fun loadInputs(onProgress: (Boolean, Int) -> Unit = { _, _ -> }): Pair<SavedFile?, SavedFile?> =
+    suspend fun loadInputs(
+        onFailure: (Boolean, Exception) -> Unit = { _, _ -> },
+        onProgress: (Boolean, Int) -> Unit = { _, _ -> }
+    ): Pair<SavedFile?, SavedFile?> =
         withContext(Dispatchers.IO) {
             operationMutex.withLock {
-                val data = files.get("$slotPrefix.data")
-                val wallet = files.get("$slotPrefix.wallet")
                 val job = currentCoroutineContext()
-                database.runInTransaction {
-                    data?.let { ensureImported(it, true, { job.ensureActive() }, onProgress) }
-                    wallet?.let { ensureImported(it, false, { job.ensureActive() }, onProgress) }
+                fun restore(saved: SavedFile?, isData: Boolean): SavedFile? {
+                    if (saved == null) return null
+                    return try {
+                        database.runInTransaction {
+                            ensureImported(saved, isData, { job.ensureActive() }, onProgress)
+                        }
+                        saved
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (failure: Exception) {
+                        // Keep the original file for recovery, but do not let it hide the other input.
+                        onFailure(isData, failure)
+                        null
+                    }
                 }
+                val data = restore(files.get("$slotPrefix.data"), true)
+                val wallet = restore(files.get("$slotPrefix.wallet"), false)
                 data to wallet
             }
         }

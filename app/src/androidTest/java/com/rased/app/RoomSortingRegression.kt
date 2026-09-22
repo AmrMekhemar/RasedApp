@@ -17,7 +17,10 @@ import kotlinx.coroutines.runBlocking
 /** Production repository checks in dedicated slots, preserving the user's inputs. */
 class RoomSortingRegression(private val context: Context) {
     fun run(verifyAfterRestart: Boolean) = runBlocking {
-        if (!verifyAfterRestart) verifyMigration()
+        if (!verifyAfterRestart) {
+            verifyMigration()
+            verifyInputRecovery()
+        }
         val repository = SortingRepository(context, "room.regression")
         val files = SavedFileStorage(context)
         val dao = RasedDatabase.getInstance(context).sorting()
@@ -119,6 +122,39 @@ class RoomSortingRegression(private val context: Context) {
 
     private fun write(file: File, headers: List<String>, rows: List<List<String>>) {
         file.outputStream().use { output -> XlsxWriter.write(output, headers) { emit -> rows.forEach(emit) } }
+    }
+
+    private suspend fun verifyInputRecovery() {
+        val files = SavedFileStorage(context)
+        val source = File.createTempFile("recovery-source-", ".xlsx", context.cacheDir)
+        try {
+            for (brokenData in listOf(true, false)) {
+                val prefix = "room.recovery.$brokenData"
+                val repository = SortingRepository(context, prefix)
+                val brokenSlot = "$prefix.${if (brokenData) "data" else "wallet"}"
+                val healthySlot = "$prefix.${if (brokenData) "wallet" else "data"}"
+                write(source, listOf("اللوحة"), listOf(listOf("ابج1234")))
+                // Both files need importing, as after upgrading the parser or restoring metadata.
+                val healthy = files.replace(healthySlot, Uri.fromFile(source))
+                source.writeText("damaged workbook")
+                files.replace(brokenSlot, Uri.fromFile(source))
+                val failures = mutableListOf<Boolean>()
+                val restored = repository.loadInputs(onFailure = { isData, _ -> failures += isData })
+                check(failures == listOf(brokenData))
+                check((if (brokenData) restored.first else restored.second) == null)
+                check((if (brokenData) restored.second else restored.first) == healthy)
+
+                // A replacement must recover the session without clearing either input or the database.
+                write(source, listOf("اللوحة"), listOf(listOf("ابج1234")))
+                repository.replaceInput(Uri.fromFile(source), brokenData)
+                check(files.get(healthySlot) == healthy)
+                val completed = repository.sort()
+                completed.store.use { check(completed.count == 1) }
+                repository.loadInputs(onFailure = { _, failure -> throw failure })
+            }
+        } finally {
+            source.delete()
+        }
     }
 
     private fun verifyMigration() {

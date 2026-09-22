@@ -5,6 +5,7 @@ import android.net.Uri
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.util.Log
 import androidx.core.content.FileProvider
 import java.io.File
 import androidx.lifecycle.AndroidViewModel
@@ -48,14 +49,24 @@ class SortingViewModel @JvmOverloads constructor(
         viewModelScope.launch {
             fileMutex.withLock {
                 try {
-                    val (data, wallet) = repository.loadInputs(::importProgress)
+                    val restoreErrors = mutableListOf<String>()
+                    val (data, wallet) = repository.loadInputs(
+                        onFailure = { isData, failure ->
+                            Log.e("SortingViewModel", "Cannot restore sorting input (isData=$isData)", failure)
+                            val label = if (isData) "الداتا" else "المحفظة"
+                            restoreErrors += "تعذر استعادة ملف $label؛ اختر الملف مجددًا. ${failure.message.orEmpty()}"
+                        },
+                        onProgress = ::importProgress
+                    )
                     _state.update { it.copy(
                         dataFileUri = data?.let(savedFiles::uri), dataFileName = data?.displayName,
-                        walletFileUri = wallet?.let(savedFiles::uri), walletFileName = wallet?.displayName
+                        walletFileUri = wallet?.let(savedFiles::uri), walletFileName = wallet?.displayName,
+                        message = restoreErrors.takeIf { it.isNotEmpty() }?.joinToString("\n")
                     ) }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (failure: Exception) {
+                    Log.e("SortingViewModel", "Cannot restore saved inputs", failure)
                     _state.update { it.copy(message = "تعذر استعادة الملفات المحفوظة") }
                 } finally {
                     finishFileOperation()
@@ -87,7 +98,8 @@ class SortingViewModel @JvmOverloads constructor(
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (failure: Exception) {
-                    _state.update { it.copy(message = "تعذر حفظ الملف الجديد؛ لم يتم تغيير الملف السابق") }
+                    Log.e("SortingViewModel", "Cannot replace sorting input (isData=$isData)", failure)
+                    _state.update { it.copy(message = "تعذر حفظ الملف الجديد؛ لم يتم تغيير الملف السابق. ${failure.message.orEmpty()}") }
                 } finally {
                     finishFileOperation()
                 }
