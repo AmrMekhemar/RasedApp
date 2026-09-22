@@ -43,7 +43,8 @@ internal fun SortingResultCard(result: SortingResult) {
     Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)) {
             ResultCardHeader(result)
             if (hasAddress) {
                 HorizontalDivider(color = CardLine)
@@ -70,11 +71,19 @@ internal fun SortingResultCard(result: SortingResult) {
 @Composable
 private fun ResultCardHeader(result: SortingResult) {
     val context = LocalContext.current
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(Modifier.size(48.dp).background(Color(0xFFE2EFFE), RoundedCornerShape(15.dp)),
-                contentAlignment = Alignment.Center) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+            Box(
+                modifier = Modifier.size(48.dp)
+                    .background(Color(0xFFE2EFFE), RoundedCornerShape(15.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
                 Icon(painterResource(R.drawable.ic_result_car), null, tint = Color(0xFF387DBA),
                     modifier = Modifier.size(28.dp))
             }
@@ -150,16 +159,26 @@ private fun SectionDivider(color: Color = CardLine) {
 private fun ResultCardFooter(result: SortingResult) {
     val context = LocalContext.current
     val uri = LocationLinks.uri(result.location)
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp))
-        .background(CardMint).border(BorderStroke(0.5.dp, Color(0xFFD6F1E6)), RoundedCornerShape(15.dp))
-        .height(IntrinsicSize.Min).padding(horizontal = 10.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8 .dp))
+        .background(CardMint)
+        .border(BorderStroke(0.5.dp, Color(0xFFD6F1E6)), RoundedCornerShape(8.dp))
+        .height(IntrinsicSize.Min)
+        .padding(horizontal = 10.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
         if (!result.date.isNullOrBlank()) {
             Row(Modifier.weight(1.2f), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 Icon(painterResource(R.drawable.ic_result_calendar), null, tint = CardMuted,
                     modifier = Modifier.size(24.dp))
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Column(
+                   modifier =  Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
                     Text("التاريخ", color = CardMuted, style = MaterialTheme.typography.labelSmall)
                     Text(result.date, color = CardInk, style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Medium)
