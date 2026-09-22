@@ -40,11 +40,11 @@ private val CardGreen = Color(0xFF00976D)
 internal fun SortingResultCard(result: SortingResult) {
     val hasAddress = !result.district.isNullOrBlank() || !result.street.isNullOrBlank()
     val hasFooter = !result.date.isNullOrBlank() || !result.location.isNullOrBlank()
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp),
+    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(15.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
-        Column(Modifier.padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)) {
+        Column(Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)) {
             ResultCardHeader(result)
             if (hasAddress) {
                 HorizontalDivider(color = CardLine)
@@ -72,7 +72,7 @@ internal fun SortingResultCard(result: SortingResult) {
 private fun ResultCardHeader(result: SortingResult) {
     val context = LocalContext.current
     Column(
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -142,7 +142,7 @@ private fun CardAction(icon: Int, label: String, onClick: () -> Unit) {
 private fun AddressField(label: String, value: String, icon: Int, modifier: Modifier) {
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
         Icon(painterResource(icon), null, tint = CardMuted, modifier = Modifier.size(22.dp))
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(label, color = CardMuted, style = MaterialTheme.typography.bodySmall)
             Text(value, color = CardInk, style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium)

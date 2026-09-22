@@ -8,6 +8,8 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -64,10 +66,10 @@ fun ResultsTable(
     }
     // One horizontal viewport keeps the header and every row aligned. The
     // bounded LazyColumn composes only visible rows, even for large workbooks.
-    Box(Modifier.fillMaxWidth().horizontalScroll(horizontalScroll)) {
+    Box(Modifier.fillMaxSize().horizontalScroll(horizontalScroll)) {
         Column(
             Modifier.width(resultColumns.fold(0.dp) { width, column -> width + column.width })
-                .height(420.dp)
+                .fillMaxHeight()
         ) {
             Row(Modifier.background(MaterialTheme.colorScheme.surfaceVariant)) {
                 resultColumns.forEach { column ->

@@ -1,7 +1,9 @@
 package com.rased.feature.sorting.ui.components
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -20,25 +22,26 @@ import com.rased.feature.sorting.domain.SortingResult
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 /** Uses available content width, including split-screen, rather than device type. */
+@SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 fun SortingResults(
     results: List<SortingResult>,
     resultCount: Int,
     resultStart: Int,
     onVisibleRow: (Int) -> Unit,
-    listState: LazyListState = rememberLazyListState()
+    listState: LazyListState = rememberLazyListState(),
+    modifier: Modifier = Modifier
 ) {
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
+    BoxWithConstraints(modifier.fillMaxSize()) {
         if (maxWidth < 600.dp) {
             LaunchedEffect(listState, onVisibleRow) {
                 snapshotFlow { listState.firstVisibleItemIndex }
                     .distinctUntilChanged()
                     .collect { onVisibleRow(it) }
             }
-            // Keep the list bounded inside the screen's scrolling input form.
-            // Paging still loads only a small window, even with thousands of cards.
+            // The screen supplies the remaining height; paging stays bounded to visible rows.
             LazyColumn(
-                modifier = Modifier.fillMaxWidth().height(520.dp),
+                modifier = Modifier.fillMaxSize(),
                 state = listState,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
@@ -57,8 +60,8 @@ fun SortingResults(
     }
 }
 
-@Preview(showBackground = true, locale = "ar", widthDp = 320, name = "Phone")
-@Preview(showBackground = true, locale = "ar", widthDp = 840, name = "Tablet")
+@Preview(showBackground = true, locale = "ar", widthDp = 320, heightDp = 640, name = "Phone")
+@Preview(showBackground = true, locale = "ar", widthDp = 840, heightDp = 640, name = "Tablet")
 @Composable
 private fun SortingResultsPreview() {
     RasedTheme {
