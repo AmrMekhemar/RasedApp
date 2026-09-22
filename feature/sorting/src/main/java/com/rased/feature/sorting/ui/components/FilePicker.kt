@@ -20,9 +20,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 
 @Composable
-internal fun FilePickerCard(title: String, description: String, fileName: String?, buttonText: String, onPick: () -> Unit) {
+internal fun FilePickerCard(title: String, description: String, fileName: String?, buttonText: String, onPick: () -> Unit, modifier: Modifier = Modifier) {
     Card(
-        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp),
+        modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         border = BorderStroke(1.dp, SortingStyle.Border)
     ) {

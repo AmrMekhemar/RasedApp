@@ -11,7 +11,7 @@ internal object SortingStyle {
     val Muted = Color(0xFF697A88)
     val Background = Color(0xFFF5F7FA)
     val Border = Color(0xFFE0E8ED)
-    val Tint = Color(0xFFEDF7F5)
+    val Tint = Color(0xFFD8ECE6)
 }
 
 @Composable

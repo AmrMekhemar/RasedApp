@@ -2,6 +2,7 @@ package com.rased.feature.sorting.ui
 
 import android.content.Intent
 import android.content.ClipData
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
@@ -34,27 +35,37 @@ fun SortingRoute(onBack: () -> Unit, viewModel: SortingViewModel = viewModel()) 
     }
 
 
-    SortingScreen(
-        state = state,
-        onBack = onBack,
-        onPickData = { dataPicker.launch(excelMimeTypes) },
-        onPickWallet = { walletPicker.launch(excelMimeTypes) },
-        onUseTextWalletChange = viewModel::setUseTextWallet,
-        onWalletTextChange = viewModel::setWalletText,
-        onStartSorting = viewModel::startSorting,
-        onCopyResults = viewModel::copyResults,
-        onSaveResults = { resultsSaver.launch("Rased-results.xlsx") },
-        onShareResults = {
-            viewModel.shareResults { uri ->
-                val intent = Intent(Intent.ACTION_SEND).apply {
-                    type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    putExtra(Intent.EXTRA_STREAM, uri)
-                    clipData = ClipData.newRawUri("نتائج راصد", uri)
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    BackHandler(enabled = state.showResults, onBack = viewModel::closeResults)
+
+    if (state.showResults) {
+        SortingResultsScreen(
+            state = state,
+            onBack = viewModel::closeResults,
+            onCopyResults = viewModel::copyResults,
+            onSaveResults = { resultsSaver.launch("Rased-results.xlsx") },
+            onShareResults = {
+                viewModel.shareResults { uri ->
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        clipData = ClipData.newRawUri("نتائج راصد", uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    context.startActivity(Intent.createChooser(intent, "مشاركة النتائج Excel"))
                 }
-                context.startActivity(Intent.createChooser(intent, "مشاركة النتائج Excel"))
-            }
-        },
-        onVisibleRow = viewModel::loadVisibleRows
-    )
+            },
+            onVisibleRow = viewModel::loadVisibleRows
+        )
+    } else {
+        SortingScreen(
+            state = state,
+            onBack = onBack,
+            onPickData = { dataPicker.launch(excelMimeTypes) },
+            onPickWallet = { walletPicker.launch(excelMimeTypes) },
+            onUseTextWalletChange = viewModel::setUseTextWallet,
+            onWalletTextChange = viewModel::setWalletText,
+            onStartSorting = viewModel::startSorting,
+            onShowResults = viewModel::openResults
+        )
+    }
 }

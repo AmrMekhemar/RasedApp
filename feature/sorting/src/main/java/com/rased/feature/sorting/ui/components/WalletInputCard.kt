@@ -33,10 +33,11 @@ internal fun WalletInputCard(
     walletFileName: String?,
     onUseTextWalletChange: (Boolean) -> Unit,
     onWalletTextChange: (String) -> Unit,
-    onPickWallet: () -> Unit
+    onPickWallet: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp),
+        modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         border = BorderStroke(1.dp, SortingStyle.Border)
     ) {

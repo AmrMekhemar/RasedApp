@@ -107,6 +107,8 @@ class SortingViewModel @JvmOverloads constructor(
     fun setUseTextWallet(value: Boolean) = _state.update { it.copy(useTextWallet = value, message = null) }
     fun setWalletText(value: String) = _state.update { it.copy(walletText = value, message = null) }
     fun clearMessage() = _state.update { it.copy(message = null) }
+    fun openResults() = _state.update { it.copy(showResults = it.hasCompletedSorting) }
+    fun closeResults() = _state.update { it.copy(showResults = false) }
 
     fun startSorting() {
         val current = _state.value
@@ -127,7 +129,8 @@ class SortingViewModel @JvmOverloads constructor(
 
         pageJob?.cancel()
         requestedStart = 0
-        _state.update { it.copy(isLoading = true, results = emptyList(), resultCount = 0, resultStart = 0, message = null) }
+        _state.update { it.copy(isLoading = true, hasCompletedSorting = false, showResults = false,
+            results = emptyList(), resultCount = 0, resultStart = 0, message = null) }
         viewModelScope.launch(Dispatchers.IO) {
             var pending: ResultStore? = null
             try {
@@ -148,7 +151,8 @@ class SortingViewModel @JvmOverloads constructor(
                     store = next
                     pending = null
                     _state.update {
-                        it.copy(isLoading = false, results = firstPage, resultCount = count,
+                        it.copy(isLoading = false, hasCompletedSorting = true, showResults = true,
+                            results = firstPage, resultCount = count,
                             message = if (count == 0) "لا توجد لوحات مطابقة" else "تم العثور على $count نتيجة")
                     }
                 }

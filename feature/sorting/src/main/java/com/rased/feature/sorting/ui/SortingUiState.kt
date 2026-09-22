@@ -13,6 +13,8 @@ data class SortingUiState(
     val useTextWallet: Boolean = false,
     val walletText: String = "",
     val isLoading: Boolean = false,
+    val hasCompletedSorting: Boolean = false,
+    val showResults: Boolean = false,
     val results: List<SortingResult> = emptyList(),
     val resultCount: Int = 0,
     val resultStart: Int = 0,
