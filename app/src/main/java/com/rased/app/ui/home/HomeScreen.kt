@@ -16,6 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,7 +28,7 @@ import com.rased.core.ui.RasedTheme
 import com.rased.app.BuildConfig
 
 @Composable
-fun HomeScreen(onOpenSorting: () -> Unit, onOpenUnloading: () -> Unit, onOpenChecking: () -> Unit) {
+fun HomeScreen(onOpenSorting: () -> Unit, onOpenUnloading: () -> Unit, onOpenChecking: () -> Unit, onLogout: () -> Unit) {
     Scaffold(containerColor = HomeStyle.Background) { padding ->
         Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
             Column(
@@ -36,6 +37,9 @@ fun HomeScreen(onOpenSorting: () -> Unit, onOpenUnloading: () -> Unit, onOpenChe
                 verticalArrangement = Arrangement.spacedBy(22.dp)
             ) {
                 HomeHeader()
+                OutlinedButton(onClick = onLogout, modifier = Modifier.align(Alignment.End)) {
+                    Text("تسجيل الخروج")
+                }
                 HomeHero()
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("أدواتك", color = HomeStyle.Ink, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -82,5 +86,5 @@ private fun HomeHeader() {
 @Preview(showBackground = true, locale = "ar", widthDp = 840, heightDp = 1100)
 @Composable
 private fun HomeScreenPreview() {
-    RasedTheme { HomeScreen({}, {}, {}) }
+    RasedTheme { HomeScreen({}, {}, {}, {}) }
 }
