@@ -118,7 +118,7 @@ class SortingSpeedBenchmark(private val context: Context) {
                 repository.replaceInput(Uri.fromFile(data), true)
                 repository.replaceInput(Uri.fromFile(wallet), false)
                 line("productionRoomImportIncludingDurableCopies=${now() - importStart}")
-                repository.loadInputs { _, _ -> error("Unchanged input was imported again") }
+                repository.loadInputs { _, _, _ -> error("Unchanged input was imported again") }
                 repeat(if (warmup) 1 else 3) { run ->
                     val start = now()
                     val completed = repository.sort()
@@ -183,3 +183,4 @@ class SortingSpeedBenchmark(private val context: Context) {
     private inline fun timed(block: () -> Unit): Long { val start = now(); block(); return now() - start }
     private fun line(text: String) { report.appendLine(text); Log.i("SortingSpeed", text) }
 }
+

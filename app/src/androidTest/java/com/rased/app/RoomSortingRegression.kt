@@ -51,7 +51,7 @@ class RoomSortingRegression(private val context: Context) {
                 val dataRevision = dao.imported("room.regression.data")!!
                 val walletRevision = dao.imported("room.regression.wallet")!!
                 source.delete()
-                repository.loadInputs { _, _ -> error("Unexpected re-import") }
+                repository.loadInputs { _, _, _ -> error("Unexpected re-import") }
                 val completed = repository.sort()
                 completed.store.use { snapshot ->
                     check(completed.count == 2)
@@ -78,7 +78,7 @@ class RoomSortingRegression(private val context: Context) {
 
                     write(source, listOf("اللوحة", "النوع"), listOf(listOf("ابج1234", "changed")))
                     val failure = runCatching {
-                        repository.replaceInput(Uri.fromFile(source), true) { _, rows ->
+                        repository.replaceInput(Uri.fromFile(source), true) { _, rows, _ ->
                             if (rows > 0) throw CancellationException("Simulate cancellation before commit")
                         }
                     }.exceptionOrNull()
@@ -115,7 +115,7 @@ class RoomSortingRegression(private val context: Context) {
                 export.delete()
             }
         }
-        repository.loadInputs { _, _ -> error("Re-import after process restart") }
+        repository.loadInputs { _, _, _ -> error("Re-import after process restart") }
         val restored = repository.sort()
         restored.store.use {
             check(restored.count == 1)
@@ -367,3 +367,4 @@ class RoomSortingRegression(private val context: Context) {
         } finally { context.deleteDatabase(name) }
     }
 }
+
