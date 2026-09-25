@@ -85,13 +85,13 @@ fun SortingScreen(
                                             onPick = onPickData,
                                             additionalFileNames = state.additionalDataFileNames,
                                             onAdd = if (state.additionalDataFileNames.size < 1) onAddData else null,
-                                            addEnabled = !state.isLoading && !state.isExporting && !state.isManagingFiles,
+                                            addEnabled = !state.isLoading && !state.isExporting && !state.isManagingFiles && !state.isIndexing,
                                             indexing = state.dataIndexing,
                                             additionalIndexing = state.additionalDataIndexing,
                                             onPickAdditional = onPickAdditionalData,
                                             onRemoveAdditional = { index -> onRemoveData(index + 1) },
                                             onRemove = { onRemoveData(0) },
-                                            removeEnabled = !state.isLoading && !state.isExporting && !state.isManagingFiles,
+                                            removeEnabled = !state.isLoading && !state.isExporting && !state.isManagingFiles && !state.isIndexing,
                                             modifier = Modifier.width(cardWidth).fillMaxHeight()
                                         )
                                         WalletInputCard(
@@ -110,7 +110,7 @@ fun SortingScreen(
                                             onPick = onPickChecking,
                                             stepNumber = "٣",
                                             onRemove = onRemoveChecking,
-                                            removeEnabled = !state.isLoading && !state.isExporting && !state.isManagingFiles,
+                                            removeEnabled = !state.isLoading && !state.isExporting && !state.isManagingFiles && !state.isIndexing,
                                              indexing = state.checkingIndexing,
                                             modifier = Modifier.width(cardWidth).fillMaxHeight()
                                         )

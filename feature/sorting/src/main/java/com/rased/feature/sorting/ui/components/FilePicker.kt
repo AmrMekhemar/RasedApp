@@ -118,7 +118,7 @@ internal fun FilePickerInline(
 
 @Composable
 private fun IndexingText(progress: IndexingProgress) {
-    val text = if (progress.total > 0) "فهرسة: ${progress.rows} / ${progress.total} صف (${progress.percentage}%)" else "جاري الفهرسة: ${progress.rows} صف"
+    val text = if (progress.total > 0) "الصفوف: ${progress.rows} / ${progress.total} (${progress.percentage}%)" else "الصفوف: ${progress.rows} / — (جاري الحساب)"
     Text(text, color = SortingStyle.Teal, style = MaterialTheme.typography.bodySmall)
 }
 

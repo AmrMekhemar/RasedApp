@@ -107,7 +107,7 @@ class SortingViewModel @JvmOverloads constructor(
     }
 
     fun importSharedFile(uri: Uri, target: Int) {
-        if (_state.value.isLoading || _state.value.isExporting) return
+        if (_state.value.isLoading || _state.value.isExporting || _state.value.isIndexing) return
         when (target) {
             0 -> saveInputFile(uri, isData = true)
             1 -> importSecondData(uri)
@@ -117,6 +117,7 @@ class SortingViewModel @JvmOverloads constructor(
     }
 
     private fun importSecondData(uri: Uri) {
+        if (_state.value.isIndexing) return
         pendingFileOperations++
         activeFileName = uri.lastPathSegment ?: "الملف"
         showFileProgress(0)
@@ -139,7 +140,7 @@ class SortingViewModel @JvmOverloads constructor(
         }
     }
     fun removeDataFile(index: Int) {
-        if (_state.value.isLoading || _state.value.isExporting || _state.value.isManagingFiles) return
+        if (_state.value.isLoading || _state.value.isExporting || _state.value.isManagingFiles || _state.value.isIndexing) return
         pendingFileOperations++
         _state.update { it.copy(isManagingFiles = true, message = null) }
         fileOperationJob = viewModelScope.launch {
@@ -164,7 +165,7 @@ class SortingViewModel @JvmOverloads constructor(
     fun setCheckingFile(uri: Uri?) = saveInputFile(uri, isData = false, isChecking = true)
 
     fun removeWalletFile() {
-        if (_state.value.isLoading || _state.value.isExporting || _state.value.isManagingFiles) return
+        if (_state.value.isLoading || _state.value.isExporting || _state.value.isManagingFiles || _state.value.isIndexing) return
         pendingFileOperations++
         _state.update { it.copy(isManagingFiles = true, message = null) }
         backgroundIndexJobs["sorting.wallet"]?.cancel()
@@ -187,7 +188,7 @@ class SortingViewModel @JvmOverloads constructor(
     }
 
     fun removeCheckingFile() {
-        if (_state.value.isLoading || _state.value.isExporting || _state.value.isManagingFiles) return
+        if (_state.value.isLoading || _state.value.isExporting || _state.value.isManagingFiles || _state.value.isIndexing) return
         pendingFileOperations++
         _state.update { it.copy(isManagingFiles = true, message = null) }
         fileOperationJob = viewModelScope.launch {
@@ -219,7 +220,7 @@ class SortingViewModel @JvmOverloads constructor(
 
     private fun saveInputFile(uri: Uri?, isData: Boolean, isChecking: Boolean = false, appendData: Boolean = false, dataIndex: Int? = null) {
         if (uri == null) return
-        if (_state.value.isLoading || _state.value.isExporting) {
+        if (_state.value.isLoading || _state.value.isExporting || _state.value.isIndexing) {
             _state.update { it.copy(message = "انتظر انتهاء العملية ثم اختر الملف الجديد") }
             return
         }
@@ -347,7 +348,7 @@ class SortingViewModel @JvmOverloads constructor(
 
     fun startSorting() {
         val current = _state.value
-        if (current.isLoading || current.isExporting || current.isManagingFiles) return
+        if (current.isLoading || current.isExporting || current.isManagingFiles || current.isIndexing) return
         val dataUri = current.dataFileUri
         if (dataUri == null && current.additionalDataFileNames.isEmpty()) {
             _state.update { it.copy(message = "اختر ملف الداتا أولًا") }
@@ -471,7 +472,7 @@ class SortingViewModel @JvmOverloads constructor(
     }
 
     private fun withResults(action: suspend (ResultStore) -> Unit) {
-        if (_state.value.isLoading || _state.value.isExporting) return
+        if (_state.value.isLoading || _state.value.isExporting || _state.value.isIndexing) return
         val old = _state.value.showingOld
         _state.update { it.copy(isExporting = true, message = null) }
         viewModelScope.launch(Dispatchers.IO) {
