@@ -47,6 +47,7 @@ fun SortingScreen(
     onShowResults: () -> Unit,
     onPickChecking: () -> Unit = {},
     onRemoveChecking: () -> Unit = {},
+    onRemoveWallet: () -> Unit = {},
     onAddData: () -> Unit = {},
     onPickAdditionalData: (Int) -> Unit = {},
     onRemoveData: (Int) -> Unit = {},
@@ -97,6 +98,8 @@ fun SortingScreen(
                                             state.useTextWallet, state.walletText, state.walletFileName ?: state.walletFileUri?.lastPathSegment,
                                             onUseTextWalletChange, onWalletTextChange, onPickWallet,
                                              indexing = state.walletIndexing,
+                                             onRemove = onRemoveWallet,
+                                             removeEnabled = !state.isLoading && !state.isExporting && !state.isManagingFiles && !state.isIndexing,
                                             modifier = Modifier.width(cardWidth).fillMaxHeight()
                                         )
                                         FilePickerCard(

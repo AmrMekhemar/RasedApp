@@ -83,6 +83,7 @@ fun SortingRoute(onBack: () -> Unit, viewModel: SortingViewModel = viewModel()) 
             onShowResults = viewModel::openResults,
             onPickChecking = { checkingPicker.launch(excelMimeTypes) },
             onRemoveChecking = viewModel::removeCheckingFile,
+            onRemoveWallet = viewModel::removeWalletFile,
             onAddData = { additionalDataPicker.launch(excelMimeTypes) }
             , onPickAdditionalData = { index ->
                 dataEditIndex = index + 1

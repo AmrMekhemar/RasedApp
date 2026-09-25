@@ -163,6 +163,29 @@ class SortingViewModel @JvmOverloads constructor(
 
     fun setCheckingFile(uri: Uri?) = saveInputFile(uri, isData = false, isChecking = true)
 
+    fun removeWalletFile() {
+        if (_state.value.isLoading || _state.value.isExporting || _state.value.isManagingFiles) return
+        pendingFileOperations++
+        _state.update { it.copy(isManagingFiles = true, message = null) }
+        backgroundIndexJobs["sorting.wallet"]?.cancel()
+        fileOperationJob = viewModelScope.launch {
+            fileMutex.withLock {
+                try {
+                    repository.removeWallet()
+                    _state.update { it.copy(walletFileUri = null, walletFileName = null, walletIndexing = null,
+                        hasCompletedSorting = false, showResults = false, results = emptyList(), resultCount = 0,
+                        resultStart = 0, newCount = 0, oldCount = 0) }
+                } catch (cancelled: CancellationException) { throw cancelled
+                } catch (failure: Exception) {
+                    _state.update { it.copy(message = "تعذر إزالة ملف المحفظة. ${failure.message.orEmpty()}") }
+                } finally {
+                    finishFileOperation()
+                    fileOperationJob = null
+                }
+            }
+        }
+    }
+
     fun removeCheckingFile() {
         if (_state.value.isLoading || _state.value.isExporting || _state.value.isManagingFiles) return
         pendingFileOperations++

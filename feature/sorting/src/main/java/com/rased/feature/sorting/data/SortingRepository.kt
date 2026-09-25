@@ -114,6 +114,16 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
         }
     }
 
+    suspend fun removeWallet() = withContext(Dispatchers.IO) {
+        operationMutex.withLock {
+            val slot = ".wallet"
+            files.remove(slot) {
+                dao.imported(slot)?.let { dao.deleteWallet(it.revision) }
+                dao.deleteImport(slot)
+            }
+        }
+    }
+
     suspend fun removeChecking() = withContext(Dispatchers.IO) {
         operationMutex.withLock {
             val slot = "$slotPrefix.checking"

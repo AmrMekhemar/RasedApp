@@ -37,7 +37,8 @@ internal fun WalletInputCard(
     onWalletTextChange: (String) -> Unit,
     onPickWallet: () -> Unit,
     modifier: Modifier = Modifier,
-    indexing: IndexingProgress? = null
+    indexing: IndexingProgress? = null,
+    onRemove: (() -> Unit)? = null, removeEnabled: Boolean = true
 ) {
     Card(
         modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp),
@@ -76,7 +77,7 @@ internal fun WalletInputCard(
                     placeholder = { Text("امط8845\nبكب1234") }
                 )
             } else {
-                FilePickerInline(walletFileName, "اختيار ملف المحفظة", onPickWallet, indexing = indexing)
+                FilePickerInline(walletFileName, "اختيار ملف المحفظة", onPickWallet, onRemove = onRemove, removeEnabled = removeEnabled, indexing = indexing)
                 Text("سيتم قراءة أول شيت ظاهر في الملف", style = MaterialTheme.typography.bodySmall, color = SortingStyle.Muted)
             }
         }
