@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.width
 
 @Composable
 internal fun FilePickerCard(
@@ -67,21 +68,39 @@ internal fun FilePickerInline(
             style = MaterialTheme.typography.labelMedium, color = SortingStyle.Teal)
         @Composable
         fun fileRow(name: String?, index: Int, change: () -> Unit, remove: (() -> Unit)?) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(name ?: "اختر الملف من جهازك", Modifier.weight(1f), maxLines = 2,
-                    overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, color = SortingStyle.Ink)
-                OutlinedButton(onClick = change, enabled = name != null || index == 0,
-                    modifier = if (name == null) Modifier.size(44.dp) else Modifier.weight(0.55f),
-                    shape = RoundedCornerShape(10.dp),
-                    contentPadding = if (name == null) PaddingValues(0.dp) else ButtonDefaults.ContentPadding,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = SortingStyle.Teal),
-                    border = BorderStroke(1.dp, SortingStyle.Teal.copy(alpha = 0.65f))) {
-                    Text(if (name == null) "+" else "تغيير", color = SortingStyle.Teal,
-                        style = if (name == null) MaterialTheme.typography.headlineSmall
-                        else MaterialTheme.typography.labelMedium)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Card(
+                    modifier = Modifier.weight(1f).fillMaxWidth(0.65f),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = BorderStroke(1.dp, SortingStyle.Border)
+                ) {
+                    Text(name ?: "اختر الملف من جهازك", Modifier.fillMaxWidth().padding(10.dp), maxLines = 4,
+                        overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, color = SortingStyle.Ink)
                 }
-                if (remove != null && name != null) TextButton(onClick = remove, enabled = removeEnabled) {
-                    Text("حذف", color = MaterialTheme.colorScheme.error)
+                if (name == null) {
+                    OutlinedButton(onClick = change, enabled = index == 0, modifier = Modifier.size(44.dp),
+                        shape = RoundedCornerShape(10.dp), contentPadding = PaddingValues(0.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = SortingStyle.Teal),
+                        border = BorderStroke(1.dp, SortingStyle.Teal.copy(alpha = 0.65f))) {
+                        Text("+", color = SortingStyle.Teal, style = MaterialTheme.typography.headlineSmall)
+                    }
+                } else {
+                    Column(Modifier.width(112.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        OutlinedButton(onClick = change, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(vertical = 8.dp, horizontal = 6.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = SortingStyle.Teal),
+                            border = BorderStroke(1.dp, SortingStyle.Teal.copy(alpha = 0.65f))) {
+                            Text("تغيير", color = SortingStyle.Teal, style = MaterialTheme.typography.labelMedium)
+                        }
+                        if (remove != null) OutlinedButton(onClick = remove, enabled = removeEnabled,
+                            modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(vertical = 7.dp, horizontal = 6.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.75f)),
+                            shape = RoundedCornerShape(10.dp)) {
+                            Text("حذف", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
                 }
             }
         }
