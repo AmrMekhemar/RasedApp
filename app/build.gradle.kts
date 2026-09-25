@@ -12,8 +12,8 @@ android {
         applicationId = "com.rased.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 9
-        versionName = "0.9"
+        versionCode = 11
+        versionName = "1.1"
         testInstrumentationRunner = "com.rased.app.XlsxRegressionInstrumentation"
     }
 
