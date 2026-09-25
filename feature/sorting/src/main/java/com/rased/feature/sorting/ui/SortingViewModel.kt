@@ -91,6 +91,33 @@ class SortingViewModel @JvmOverloads constructor(
         if (uri == null) return
         saveInputFile(uri, isData = true, dataIndex = index)
     }
+
+    fun importSharedFile(uri: Uri, target: Int) {
+        if (_state.value.isLoading || _state.value.isExporting) return
+        when (target) {
+            0 -> saveInputFile(uri, isData = true)
+            1 -> importSecondData(uri)
+            2 -> saveInputFile(uri, isData = false)
+            3 -> saveInputFile(uri, isData = false, isChecking = true)
+        }
+    }
+
+    private fun importSecondData(uri: Uri) {
+        pendingFileOperations++
+        _state.update { it.copy(isManagingFiles = true, message = null) }
+        viewModelScope.launch {
+            fileMutex.withLock {
+                try {
+                    val saved = repository.replaceOrAddSecondData(uri, ::importProgress)
+                    val additional = repository.loadAdditionalData()
+                    _state.update { it.copy(additionalDataFileNames = additional.map { file -> file.displayName }) }
+                } catch (cancelled: CancellationException) { throw cancelled
+                } catch (failure: Exception) {
+                    _state.update { it.copy(message = "تعذر استيراد ملف الداتا الثاني. ${failure.message.orEmpty()}") }
+                } finally { finishFileOperation() }
+            }
+        }
+    }
     fun removeDataFile(index: Int) {
         if (_state.value.isLoading || _state.value.isExporting || _state.value.isManagingFiles) return
         pendingFileOperations++

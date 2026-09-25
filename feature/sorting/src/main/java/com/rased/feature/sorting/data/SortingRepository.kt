@@ -29,6 +29,8 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
     private val database get() = RasedDatabase.getInstance(context)
     private val dao get() = database.sorting()
 
+    suspend fun hasPrimaryData(): Boolean = files.get("$slotPrefix.data") != null
+
     suspend fun loadInputs(
         onFailure: (Boolean, Exception) -> Unit = { _, _ -> },
         onProgress: (Boolean, Int) -> Unit = { _, _ -> }
@@ -101,6 +103,11 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
                 }
             }
         }
+    }
+
+    suspend fun replaceOrAddSecondData(uri: Uri, onProgress: (Boolean, Int) -> Unit = { _, _ -> }): SavedFile {
+        return if (files.listByPrefix("$slotPrefix.data.extra.").isEmpty()) addData(uri, onProgress)
+        else replaceDataFile(1, uri, onProgress)
     }
 
     suspend fun removeDataFile(index: Int) = withContext(Dispatchers.IO) {
