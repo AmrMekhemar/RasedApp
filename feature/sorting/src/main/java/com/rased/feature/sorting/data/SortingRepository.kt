@@ -38,23 +38,9 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
         withContext(Dispatchers.IO) {
             operationMutex.withLock {
                 val job = currentCoroutineContext()
-                fun restore(saved: SavedFile?, isData: Boolean): SavedFile? {
-                    if (saved == null) return null
-                    return try {
-                        database.runInTransaction {
-                            ensureImported(saved, isData, { job.ensureActive() }, onProgress)
-                        }
-                        saved
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (failure: Exception) {
-                        // Keep the original file for recovery, but do not let it hide the other input.
-                        onFailure(isData, failure)
-                        null
-                    }
-                }
-                val data = restore(files.get("$slotPrefix.data"), true)
-                val wallet = restore(files.get("$slotPrefix.wallet"), false)
+                // Match the old fast import behavior: restoring a saved file only reads metadata.
+                val data = files.get("$slotPrefix.data")
+                val wallet = files.get("$slotPrefix.wallet")
                 data to wallet
             }
         }
@@ -63,19 +49,23 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
         withContext(Dispatchers.IO) {
             operationMutex.withLock {
                 val job = currentCoroutineContext()
-                files.replace("$slotPrefix.${if (isData) "data" else "wallet"}", uri) { saved, _ ->
-                    ensureImported(saved, isData, { job.ensureActive() }, onProgress)
-                }
+                files.replace("$slotPrefix.${if (isData) "data" else "wallet"}", uri)
             }
         }
+
+    suspend fun indexSavedInput(slot: String, isData: Boolean, sheetIndex: Int = 0) = withContext(Dispatchers.IO) {
+        val saved = files.get(slot) ?: return@withContext
+        val job = currentCoroutineContext()
+        database.runInTransaction {
+            ensureImported(saved, isData, { job.ensureActive() }, { _, _, _ -> }, sheetIndex)
+        }
+    }
 
     suspend fun loadAdditionalData(): List<SavedFile> = withContext(Dispatchers.IO) {
         operationMutex.withLock {
             val saved = files.listByPrefix("$slotPrefix.data.extra.")
             val job = currentCoroutineContext()
-            database.runInTransaction {
-                saved.forEach { ensureImported(it, true, { job.ensureActive() }, { _, _, _ -> }) }
-            }
+            Unit
             saved
         }
     }
@@ -87,7 +77,7 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
             val slot = if (files.get("$slotPrefix.data") == null) "$slotPrefix.data"
                 else prefix + (last + 1).toString().padStart(10, '0')
             val job = currentCoroutineContext()
-            files.replace(slot, uri) { saved, _ -> ensureImported(saved, true, { job.ensureActive() }, onProgress) }
+            files.replace(slot, uri)
         }
     }
 
@@ -96,11 +86,9 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
         return withContext(Dispatchers.IO) {
             operationMutex.withLock {
                 val saved = files.listByPrefix("$slotPrefix.data.extra.").getOrNull(index - 1)
-                    ?: error("ملف الداتا غير موجود")
+                    ?: error("ظ…ظ„ظپ ط§ظ„ط¯ط§طھط§ ط؛ظٹط± ظ…ظˆط¬ظˆط¯")
                 val job = currentCoroutineContext()
-                files.replace(saved.slot, uri) { replacement, _ ->
-                    ensureImported(replacement, true, { job.ensureActive() }, onProgress)
-                }
+                files.replace(saved.slot, uri)
             }
         }
     }
@@ -137,7 +125,7 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
         operationMutex.withLock {
             val saved = files.get("$slotPrefix.checking") ?: return@withLock null
             val job = currentCoroutineContext()
-            database.runInTransaction { ensureImported(saved, false, { job.ensureActive() }, { _, _, _ -> }, sheetIndex = 1) }
+            Unit
             saved
         }
     }
@@ -145,9 +133,7 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
     suspend fun replaceChecking(uri: Uri): SavedFile = withContext(Dispatchers.IO) {
         operationMutex.withLock {
             val job = currentCoroutineContext()
-            files.replace("$slotPrefix.checking", uri) { saved, _ ->
-                ensureImported(saved, false, { job.ensureActive() }, { _, _, _ -> }, sheetIndex = 1)
-            }
+            files.replace("$slotPrefix.checking", uri)
         }
     }
 
@@ -158,8 +144,8 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
         if (previous?.revision == revision) {
             if (isData) dao.deleteData(revision) else dao.deleteWallet(revision)
         }
-        val dataBatch = ArrayList<IndexedDataRow>(64)
-        val walletBatch = ArrayList<IndexedWalletRow>(64)
+        val dataBatch = ArrayList<IndexedDataRow>(IMPORT_BATCH_SIZE)
+        val walletBatch = ArrayList<IndexedWalletRow>(IMPORT_BATCH_SIZE)
         var keys: List<String?>? = null
         var sequence = 0L
         val aliases = if (isData) DATA_COLUMNS else listOf(SortingEngine.plateNames(), SortingEngine.walletTypeNames(), SortingEngine.locationNames())
@@ -169,7 +155,7 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
             if (keys == null) keys = aliases.mapIndexed { index, names ->
                 val normalizedNames = names.map(::normalizeHeader).toSet()
                 row.keys.firstOrNull { normalizeHeader(it) in normalizedNames }
-                    ?: row.keys.firstOrNull { !isData && index == 1 && normalizeHeader(it).contains(normalizeHeader("لون")) }
+                    ?: row.keys.firstOrNull { !isData && index == 1 && normalizeHeader(it).contains(normalizeHeader("ظ„ظˆظ†")) }
             }
             val values = keys!!.map { key -> key?.let(row::get)?.takeIf { it.isNotBlank() } }
             val plate = values[0]
@@ -179,8 +165,8 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
                 else walletBatch += IndexedWalletRow(revision, normalized, sequence, values[1], values[2])
             }
             sequence++
-            if (dataBatch.size >= 64) { dao.insertData(dataBatch); dataBatch.clear() }
-            if (walletBatch.size >= 64) { dao.insertWallet(walletBatch); walletBatch.clear() }
+            if (dataBatch.size >= IMPORT_BATCH_SIZE) { dao.insertData(dataBatch); dataBatch.clear() }
+            if (walletBatch.size >= IMPORT_BATCH_SIZE) { dao.insertWallet(walletBatch); walletBatch.clear() }
             if (sequence % 1000L == 0L) progress(isData, sequence.toInt(), 0)
         }, visibleSheetIndex = sheetIndex, onTotalRows = { total -> progress(isData, 0, total) })
         if (dataBatch.isNotEmpty()) dao.insertData(dataBatch)
@@ -214,9 +200,14 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
             try {
                 var count = 0
                 val dataFiles = listOfNotNull(files.get("$slotPrefix.data")) + files.listByPrefix("$slotPrefix.data.extra.")
+                val walletSaved = files.get("$slotPrefix.wallet")
+                val checkingSaved = files.get("$slotPrefix.checking")
+                if (!useChecking && walletText == null && dataFiles.isNotEmpty() && walletSaved != null) {
+                    return@withLock sortFast(dataFiles, walletSaved, job)
+                }
                 database.runInTransaction {
                     job.ensureActive()
-                    check(dataFiles.isNotEmpty()) { "اختر ملف الداتا أولًا" }
+                    check(dataFiles.isNotEmpty()) { "ط§ط®طھط± ظ…ظ„ظپ ط§ظ„ط¯ط§طھط§ ط£ظˆظ„ظ‹ط§" }
                     val revisions = dataFiles.map { saved ->
                         ensureImported(saved, true, { job.ensureActive() }, { _, _, _ -> })
                         requireNotNull(dao.imported(saved.slot)).revision
@@ -227,17 +218,23 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
                         runId
                     }
                     val walletRevision = if (walletText != null) {
-                        val batch = ArrayList<IndexedWalletRow>(64)
+                        val batch = ArrayList<IndexedWalletRow>(IMPORT_BATCH_SIZE)
                         walletText.lineSequence().forEachIndexed { index, plate ->
                             job.ensureActive()
                             PlateNormalizer.normalize(plate)?.let { batch += IndexedWalletRow(runId, it, index.toLong(), null) }
-                            if (batch.size >= 64) { dao.insertWallet(batch); batch.clear() }
+                            if (batch.size >= IMPORT_BATCH_SIZE) { dao.insertWallet(batch); batch.clear() }
                         }
                         if (batch.isNotEmpty()) dao.insertWallet(batch)
                         runId
-                    } else requireNotNull(dao.imported("$slotPrefix.wallet")) { "اختر ملف المحفظة أولًا" }.revision
+                    } else {
+                        val wallet = requireNotNull(walletSaved) { "ط§ط®طھط± ظ…ظ„ظپ ط§ظ„ظ…ط­ظپط¸ط© ط£ظˆظ„ظ‹ط§" }
+                        ensureImported(wallet, false, { job.ensureActive() }, { _, _, _ -> })
+                        requireNotNull(dao.imported(wallet.slot)).revision
+                    }
                     if (useChecking) {
-                        val checking = requireNotNull(dao.imported("$slotPrefix.checking")) { "اختر ملف التشييك أولًا" }
+                        val checkingFile = requireNotNull(checkingSaved) { "ط§ط®طھط± ظ…ظ„ظپ ط§ظ„طھط´ظٹظٹظƒ ط£ظˆظ„ظ‹ط§" }
+                        ensureImported(checkingFile, false, { job.ensureActive() }, { _, _, _ -> }, sheetIndex = 1)
+                        val checking = requireNotNull(dao.imported("$slotPrefix.checking")) { "ط§ط®طھط± ظ…ظ„ظپ ط§ظ„طھط´ظٹظٹظƒ ط£ظˆظ„ظ‹ط§" }
                         dao.matchChecked(runId, dataRevision, walletRevision, checking.revision, false)
                         dao.matchChecked(oldRunId, dataRevision, walletRevision, checking.revision, true)
                     } else dao.match(runId, dataRevision, walletRevision)
@@ -256,15 +253,36 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
             }
     }
 
+    private fun sortFast(dataFiles: List<SavedFile>, wallet: SavedFile, job: kotlin.coroutines.CoroutineContext): CompletedSorting {
+        val store = SortingStore(context.cacheDir)
+        try {
+            store.transaction {
+                reader.forEachSelectedRow(files.uri(wallet), null, SortingEngine.plateNames(),
+                    (SortingEngine.plateNames() + SortingEngine.walletTypeNames() + SortingEngine.locationNames()).toSet(),
+                    { job.ensureActive() }, store::addWalletRow)
+                dataFiles.forEach { data ->
+                    reader.forEachSelectedRow(files.uri(data), null, SortingEngine.plateNames(),
+                        DATA_COLUMNS.flatten().toSet(), { job.ensureActive() }, store::matchDataRow)
+                }
+            }
+            val count = store.finish()
+            job.ensureActive()
+            return CompletedSorting(store, count)
+        } catch (failure: Throwable) {
+            store.close()
+            throw failure
+        }
+    }
     fun exportResults(store: ResultStore, uri: Uri) {
-        requireNotNull(context.contentResolver.openOutputStream(uri, "wt")) { "تعذر حفظ النتائج" }.use(store::writeXlsx)
+        requireNotNull(context.contentResolver.openOutputStream(uri, "wt")) { "طھط¹ط°ط± ط­ظپط¸ ط§ظ„ظ†طھط§ط¦ط¬" }.use(store::writeXlsx)
     }
 
     private companion object {
         val operationMutex = Mutex()
         const val PARSER_VERSION = 8
-        val DATA_COLUMNS = listOf(SortingEngine.plateNames(), setOf("النوع"), setOf("الملاحظة", "ملاحظة", "الملاحظات"),
-            setOf("الشارع", "شارع"), setOf("الحي", "حى"), setOf("التاريخ", "تاريخ"), SortingEngine.locationNames())
+        const val IMPORT_BATCH_SIZE = 512
+        val DATA_COLUMNS = listOf(SortingEngine.plateNames(), setOf("ط§ظ„ظ†ظˆط¹"), setOf("ط§ظ„ظ…ظ„ط§ط­ط¸ط©", "ظ…ظ„ط§ط­ط¸ط©", "ط§ظ„ظ…ظ„ط§ط­ط¸ط§طھ"),
+            setOf("ط§ظ„ط´ط§ط±ط¹", "ط´ط§ط±ط¹"), setOf("ط§ظ„ط­ظٹ", "ط­ظ‰"), setOf("ط§ظ„طھط§ط±ظٹط®", "طھط§ط±ظٹط®"), SortingEngine.locationNames())
         fun normalizeHeader(value: String) = ExcelHeaders.normalize(value)
     }
 }

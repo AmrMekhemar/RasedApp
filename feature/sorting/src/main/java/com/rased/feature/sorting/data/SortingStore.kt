@@ -130,8 +130,11 @@ class SortingStore(cacheDir: File) : ResultStore {
         if (value == null) bindNull(index) else bindString(index, value)
     }
 
-    private fun value(row: Map<String, String>, aliases: Set<String>): String? =
-        row.entries.firstOrNull { it.key.trim().replace(" ", "") in aliases }?.value?.ifBlank { null }
+    private fun value(row: Map<String, String>, aliases: Set<String>): String? {
+        val exact = row.entries.firstOrNull { it.key.trim().replace(" ", "") in aliases }?.value
+        val color = row.entries.firstOrNull { it.key.replace(" ", "").contains("\u0644\u0648\u0646") }?.value
+        return (exact ?: color)?.ifBlank { null }
+    }
 
     companion object {
         const val PAGE_SIZE = 100

@@ -51,6 +51,8 @@ class SortingViewModel @JvmOverloads constructor(
     private var fileOperationJob: Job? = null
     private var activeFileName: String = "الملف"
     private val progressNotificationId = 7412
+    private var lastNotificationRows = -1
+    private val backgroundIndexJobs = mutableMapOf<String, Job>()
     private val notificationManager by lazy {
         getApplication<Application>().getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     }
@@ -213,6 +215,7 @@ class SortingViewModel @JvmOverloads constructor(
                         else if (isData) it.copy(dataFileUri = savedFiles.uri(saved), dataFileName = saved.displayName)
                         else it.copy(walletFileUri = savedFiles.uri(saved), walletFileName = saved.displayName)
                     }
+                    scheduleBackgroundIndex(saved.slot, isData = isData, sheetIndex = if (isChecking) 1 else 0)
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (failure: Exception) {
@@ -226,6 +229,19 @@ class SortingViewModel @JvmOverloads constructor(
             }
         }
     }
+    private fun scheduleBackgroundIndex(slot: String, isData: Boolean, sheetIndex: Int = 0) {
+        backgroundIndexJobs[slot]?.cancel()
+        backgroundIndexJobs[slot] = viewModelScope.launch(Dispatchers.IO) {
+            try {
+                repository.indexSavedInput(slot, isData, sheetIndex)
+            } catch (_: CancellationException) {
+                // A newer replacement or removal superseded this background index.
+            } catch (failure: Exception) {
+                Log.w("SortingViewModel", "Background index failed for $slot", failure)
+            }
+        }
+    }
+
     private fun finishFileOperation() {
         pendingFileOperations--
         _state.update { it.copy(isManagingFiles = pendingFileOperations > 0, fileProgress = null,
@@ -250,6 +266,10 @@ class SortingViewModel @JvmOverloads constructor(
         _state.update { it.copy(isManagingFiles = true, message = null, fileProgress = text,
             fileProgressRows = if (rows > 0) rows else it.fileProgressRows,
             fileProgressTotal = if (total > 0) total else it.fileProgressTotal) }
+        val shouldNotify = rows == 0 || total > 0 || rows - lastNotificationRows >= 5000 ||
+            (totalRows > 0 && loadedRows >= totalRows)
+        if (!shouldNotify) return
+        lastNotificationRows = loadedRows
         runCatching {
             if (android.os.Build.VERSION.SDK_INT >= 26) {
                 notificationManager.createNotificationChannel(
@@ -270,6 +290,7 @@ class SortingViewModel @JvmOverloads constructor(
     }
 
     private fun finishFileNotification() {
+        lastNotificationRows = -1
         runCatching { notificationManager.cancel(progressNotificationId) }
     }
 
