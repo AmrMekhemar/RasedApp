@@ -145,7 +145,7 @@ private fun ResultCardHeader(result: SortingResult) {
                         withStyle(SpanStyle(color = CardMuted)) { append("  |  ") }
                     }
                     if (!result.walletType.isNullOrBlank()) {
-                        withStyle(SpanStyle(color = CardMuted)) { append("موديل السيارة: ") }
+                        withStyle(SpanStyle(color = CardMuted)) { append("طراز السيارة: ") }
                         append(result.walletType)
                     }
                 }, color = CardInk, style = MaterialTheme.typography.bodySmall)
