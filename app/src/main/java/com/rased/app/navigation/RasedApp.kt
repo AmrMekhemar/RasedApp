@@ -13,6 +13,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import android.net.Uri
 import com.rased.app.data.DummySessionStore
 import com.rased.app.access.requiresPaidVersion
+import com.rased.app.access.requiresPaidVersionWithNetwork
 import com.rased.app.ui.home.HomeScreen
 import com.rased.app.ui.login.LoginScreen
 import com.rased.core.ui.RasedTheme
@@ -31,7 +32,10 @@ fun RasedApp(sharedFileUri: Uri? = null, onSharedFileHandled: () -> Unit = {}) {
     val sessionStore = remember(context) { DummySessionStore(context) }
     var isLoggedIn by remember(sessionStore) { mutableStateOf(sessionStore.isLoggedIn) }
     var destination by rememberSaveable { mutableStateOf(Destination.Home) }
-    val paidRequired = remember { requiresPaidVersion() }
+    var paidRequired by remember { mutableStateOf(requiresPaidVersion()) }
+    LaunchedEffect(Unit) {
+        paidRequired = requiresPaidVersionWithNetwork()
+    }
     val sortingViewModel: SortingViewModel = viewModel()
     var hasPrimaryData by remember { mutableStateOf(false) }
     LaunchedEffect(sharedFileUri) {
