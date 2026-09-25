@@ -129,24 +129,21 @@ private fun ResultCardHeader(result: SortingResult) {
                 }
             }
         }
-        if (!result.type.isNullOrBlank() || !result.walletType.isNullOrBlank()) {
+        if (!result.type.isNullOrBlank() || !result.walletModel.isNullOrBlank() || !result.walletType.isNullOrBlank()) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                if (!result.type.isNullOrBlank()) {
-                    Icon(painterResource(R.drawable.ic_result_truck), null, tint = CardMuted,
-                        modifier = Modifier.size(18.dp))
-                }
+                Icon(painterResource(R.drawable.ic_result_truck), null, tint = CardMuted,
+                    modifier = Modifier.size(18.dp))
                 Text(buildAnnotatedString {
-                    if (!result.type.isNullOrBlank()) {
-                        withStyle(SpanStyle(color = CardMuted)) { append("طراز: ") }
-                        append(result.type)
-                    }
-                    if (!result.type.isNullOrBlank() && !result.walletType.isNullOrBlank()) {
-                        withStyle(SpanStyle(color = CardMuted)) { append("  |  ") }
-                    }
-                    if (!result.walletType.isNullOrBlank()) {
-                        withStyle(SpanStyle(color = CardMuted)) { append("اللون: ") }
-                        append(result.walletType)
+                    val fields = listOf(
+                        "النوع" to result.type,
+                        "الطراز" to result.walletModel,
+                        "اللون" to result.walletType
+                    ).filter { !it.second.isNullOrBlank() }
+                    fields.forEachIndexed { index, (label, value) ->
+                        if (index > 0) withStyle(SpanStyle(color = CardMuted)) { append("  |  ") }
+                        withStyle(SpanStyle(color = CardMuted)) { append("$label: ") }
+                        append(value)
                     }
                 }, color = CardInk, style = MaterialTheme.typography.bodySmall)
             }

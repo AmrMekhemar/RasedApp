@@ -74,6 +74,7 @@ class XlsxReader(private val context: Context) {
                     onTotalRows(sheetRowCount(zip, entry))
                     val aliases = headerAliases.map(::normalizeHeader).toSet()
                     val acceptsColorColumn = aliases.contains(normalizeHeader("لون"))
+                    val acceptsModelColumn = true
                     val selected = selectedHeaders?.map(::normalizeHeader)?.toSet()
                     var headers: Map<Int, String>? = null
                     val firstRows = mutableListOf<Pair<Int, Map<Int, String>>>()
@@ -96,9 +97,9 @@ class XlsxReader(private val context: Context) {
                                 if (rowNumber <= 5) firstRows += rowNumber to row.toMap()
                                 val currentHeaders = headers
                                 if (currentHeaders == null) {
-                                    if (row.values.any { normalizeHeader(it) in aliases || (acceptsColorColumn && normalizeHeader(it).contains(normalizeHeader("لون"))) }) {
+                                    if (row.values.any { value -> normalizeHeader(value) in aliases || (acceptsColorColumn && normalizeHeader(value).contains(normalizeHeader("لون"))) || (acceptsModelColumn && (normalizeHeader(value).contains("نوع") || normalizeHeader(value).contains("طراز"))) }) {
                                         headers = row.mapValues { it.value.trim() }.filterValues {
-                                            it.isNotBlank() && (selected == null || normalizeHeader(it) in selected || (acceptsColorColumn && normalizeHeader(it).contains(normalizeHeader("لون"))))
+                                            it.isNotBlank() && (selected == null || normalizeHeader(it) in selected || (acceptsColorColumn && normalizeHeader(it).contains(normalizeHeader("لون"))) || (acceptsModelColumn && (normalizeHeader(it).contains("نوع") || normalizeHeader(it).contains("طراز"))))
                                         }
                                     }
                                     if (headers == null && rowNumber >= headerScanLimit) throw HeaderScanFinished
@@ -121,7 +122,7 @@ class XlsxReader(private val context: Context) {
                             val firstPlateRow = firstRows.first { looksLikePlate(it.second[plateColumn].orEmpty()) }.first
                             val preceding = firstRows.lastOrNull { it.first < firstPlateRow && it.second.isNotEmpty() }?.second.orEmpty()
                             headers = preceding.mapValues { it.value.trim() }.filterValues {
-                                it.isNotBlank() && (selected == null || normalizeHeader(it) in selected || (acceptsColorColumn && normalizeHeader(it).contains(normalizeHeader("لون"))))
+                                it.isNotBlank() && (selected == null || normalizeHeader(it) in selected || (acceptsColorColumn && normalizeHeader(it).contains(normalizeHeader("لون"))) || (acceptsModelColumn && (normalizeHeader(it).contains("نوع") || normalizeHeader(it).contains("طراز"))))
                             } + (plateColumn to headerAliases.first())
                             // Re-read only when no named header exists; keep the first actual plate.
                             zip.getInputStream(entry).use { input ->

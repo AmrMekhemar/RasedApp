@@ -12,6 +12,7 @@ import com.rased.core.excel.XlsxReader
 import com.rased.core.excel.ExcelHeaders
 import com.rased.feature.sorting.domain.PlateNormalizer
 import com.rased.feature.sorting.domain.SortingEngine
+import com.rased.feature.sorting.domain.WalletHeaders
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
@@ -148,21 +149,21 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
         val walletBatch = ArrayList<IndexedWalletRow>(IMPORT_BATCH_SIZE)
         var keys: List<String?>? = null
         var sequence = 0L
-        val aliases = if (isData) DATA_COLUMNS else listOf(SortingEngine.plateNames(), SortingEngine.walletTypeNames(), SortingEngine.locationNames())
+        val aliases = if (isData) DATA_COLUMNS else listOf(SortingEngine.plateNames(), WalletHeaders.modelNames, SortingEngine.walletTypeNames(), SortingEngine.locationNames())
         progress(isData, 0, 0)
         reader.forEachSelectedRow(files.uri(saved), null, SortingEngine.plateNames(), aliases.flatten().toSet(), checkActive, { row ->
             checkActive()
             if (keys == null) keys = aliases.mapIndexed { index, names ->
                 val normalizedNames = names.map(::normalizeHeader).toSet()
                 row.keys.firstOrNull { normalizeHeader(it) in normalizedNames }
-                    ?: row.keys.firstOrNull { !isData && index == 1 && normalizeHeader(it).contains(normalizeHeader("ظ„ظˆظ†")) }
+                    ?: row.keys.firstOrNull { !isData && index == 1 && (normalizeHeader(it).contains("نوع") || normalizeHeader(it).contains("طراز")) }
             }
             val values = keys!!.map { key -> key?.let(row::get)?.takeIf { it.isNotBlank() } }
             val plate = values[0]
             val normalized = PlateNormalizer.normalize(plate)
             if (normalized != null) {
                 if (isData) dataBatch += IndexedDataRow(revision, normalized, plate!!, values[1], values[2], values[3], values[4], values[5], values[6])
-                else walletBatch += IndexedWalletRow(revision, normalized, sequence, values[1], values[2])
+                else walletBatch += IndexedWalletRow(revision, normalized, sequence, values[2], values[3], values[1])
             }
             sequence++
             if (dataBatch.size >= IMPORT_BATCH_SIZE) { dao.insertData(dataBatch); dataBatch.clear() }
@@ -258,7 +259,7 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
         try {
             store.transaction {
                 reader.forEachSelectedRow(files.uri(wallet), null, SortingEngine.plateNames(),
-                    (SortingEngine.plateNames() + SortingEngine.walletTypeNames() + SortingEngine.locationNames()).toSet(),
+                    (SortingEngine.plateNames() + WalletHeaders.modelNames + SortingEngine.walletTypeNames() + SortingEngine.locationNames()).toSet(),
                     { job.ensureActive() }, store::addWalletRow)
                 dataFiles.forEach { data ->
                     reader.forEachSelectedRow(files.uri(data), null, SortingEngine.plateNames(),
@@ -279,7 +280,7 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
 
     private companion object {
         val operationMutex = Mutex()
-        const val PARSER_VERSION = 8
+        const val PARSER_VERSION = 9
         const val IMPORT_BATCH_SIZE = 512
         val DATA_COLUMNS = listOf(SortingEngine.plateNames(), setOf("ط§ظ„ظ†ظˆط¹"), setOf("ط§ظ„ظ…ظ„ط§ط­ط¸ط©", "ظ…ظ„ط§ط­ط¸ط©", "ط§ظ„ظ…ظ„ط§ط­ط¸ط§طھ"),
             setOf("ط§ظ„ط´ط§ط±ط¹", "ط´ط§ط±ط¹"), setOf("ط§ظ„ط­ظٹ", "ط­ظ‰"), setOf("ط§ظ„طھط§ط±ظٹط®", "طھط§ط±ظٹط®"), SortingEngine.locationNames())

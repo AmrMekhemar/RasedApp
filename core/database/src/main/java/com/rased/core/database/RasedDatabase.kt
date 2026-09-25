@@ -8,8 +8,8 @@ import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(entities = [SavedFile::class, SortingImport::class, IndexedDataRow::class,
-    IndexedWalletRow::class, IndexedResult::class], version = 3, exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3)])
+    IndexedWalletRow::class, IndexedResult::class], version = 4, exportSchema = true,
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4)])
 abstract class RasedDatabase : RoomDatabase() {
     abstract fun savedFiles(): SavedFileDao
     abstract fun sorting(): SortingDao

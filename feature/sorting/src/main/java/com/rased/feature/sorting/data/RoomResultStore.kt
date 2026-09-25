@@ -15,7 +15,7 @@ internal class RoomResultStore(private val dao: SortingDao, private val runId: S
         check(!closed)
         // A snapshot is inserted in one transaction, so its global ids are contiguous.
         return dao.page(runId, firstId + start, count).map {
-            SortingResult(it.plate, it.type, it.note, it.street, it.district, it.date, it.walletType, it.location)
+            SortingResult(it.plate, it.type, it.note, it.street, it.district, it.date, it.walletType, it.location, it.walletModel)
         }
     }
 
@@ -34,7 +34,7 @@ internal class RoomResultStore(private val dao: SortingDao, private val runId: S
     override fun writeXlsx(output: OutputStream) {
         check(!closed)
         XlsxWriter.write(output, HEADER.split('\t')) { writeRow ->
-            forEachResult { writeRow(listOf(it.plate, it.type, it.note, it.street, it.district, it.date, it.walletType, it.location)) }
+            forEachResult { writeRow(listOf(it.plate, it.type, it.walletModel, it.note, it.street, it.district, it.date, it.walletType, it.location)) }
         }
     }
 
@@ -54,6 +54,6 @@ internal class RoomResultStore(private val dao: SortingDao, private val runId: S
     }
 
     private companion object {
-        const val HEADER = "اللوحة\tالنوع\tالملاحظة\tالشارع\tالحي\tالتاريخ\tاللون\tالموقع"
+        const val HEADER = "اللوحة\tالنوع\tالطراز\tالملاحظة\tالشارع\tالحي\tالتاريخ\tاللون\tالموقع"
     }
 }

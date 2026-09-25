@@ -5,6 +5,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteStatement
 import com.rased.feature.sorting.domain.PlateNormalizer
 import com.rased.feature.sorting.domain.SortingEngine
+import com.rased.feature.sorting.domain.WalletHeaders
 import com.rased.feature.sorting.domain.SortingResult
 import java.io.Closeable
 import java.io.File
@@ -23,9 +24,9 @@ class SortingStore(cacheDir: File) : ResultStore {
     init {
         db.execSQL("PRAGMA cache_size = -2048")
         db.execSQL("PRAGMA temp_store = FILE")
-        db.execSQL("CREATE TABLE wallet (sequence INTEGER PRIMARY KEY, normalized TEXT UNIQUE NOT NULL, walletType TEXT, plate TEXT, type TEXT, note TEXT, street TEXT, district TEXT, date TEXT, location TEXT, walletLocation TEXT)")
-        db.execSQL("CREATE TABLE results (id INTEGER PRIMARY KEY, plate TEXT, type TEXT, note TEXT, street TEXT, district TEXT, date TEXT, walletType TEXT, location TEXT)")
-        walletInsert = db.compileStatement("INSERT OR IGNORE INTO wallet(normalized, walletType, walletLocation) VALUES (?, ?, ?)")
+        db.execSQL("CREATE TABLE wallet (sequence INTEGER PRIMARY KEY, normalized TEXT UNIQUE NOT NULL, walletType TEXT, walletModel TEXT, plate TEXT, type TEXT, note TEXT, street TEXT, district TEXT, date TEXT, location TEXT, walletLocation TEXT)")
+        db.execSQL("CREATE TABLE results (id INTEGER PRIMARY KEY, plate TEXT, type TEXT, note TEXT, street TEXT, district TEXT, date TEXT, walletType TEXT, location TEXT, walletModel TEXT)")
+        walletInsert = db.compileStatement("INSERT OR IGNORE INTO wallet(normalized, walletType, walletModel, walletLocation) VALUES (?, ?, ?, ?)")
         matchUpdate = db.compileStatement("UPDATE wallet SET plate=?, type=?, note=?, street=?, district=?, date=?, location=? WHERE normalized=? AND plate IS NULL")
     }
 
@@ -40,14 +41,15 @@ class SortingStore(cacheDir: File) : ResultStore {
     }
 
     fun addWalletRow(row: Map<String, String>) {
-        addWalletPlate(value(row, SortingEngine.plateNames()), value(row, SortingEngine.walletTypeNames()), value(row, SortingEngine.locationNames()))
+        addWalletPlate(value(row, SortingEngine.plateNames()), value(row, SortingEngine.walletTypeNames()), WalletHeaders.modelValue(row), value(row, SortingEngine.locationNames()))
     }
 
-    fun addWalletPlate(plate: String?, type: String? = null, location: String? = null) {
+    fun addWalletPlate(plate: String?, type: String? = null, model: String? = null, location: String? = null) {
         val normalized = PlateNormalizer.normalize(plate) ?: return
         walletInsert.bindString(1, normalized)
         walletInsert.bindText(2, type)
-        walletInsert.bindText(3, location)
+        walletInsert.bindText(3, model)
+        walletInsert.bindText(4, location)
         walletInsert.executeInsert()
     }
 
@@ -67,7 +69,7 @@ class SortingStore(cacheDir: File) : ResultStore {
 
     fun finish(): Int {
         // Dense row ids allow indexed page access without a growing SQL OFFSET.
-        db.execSQL("INSERT INTO results(plate,type,note,street,district,date,walletType,location) SELECT plate,type,note,street,district,date,walletType,COALESCE(location,walletLocation) FROM wallet WHERE plate IS NOT NULL ORDER BY sequence")
+        db.execSQL("INSERT INTO results(plate,type,note,street,district,date,walletType,location,walletModel) SELECT plate,type,note,street,district,date,walletType,COALESCE(location,walletLocation),walletModel FROM wallet WHERE plate IS NOT NULL ORDER BY sequence")
         db.execSQL("DROP TABLE wallet")
         return db.compileStatement("SELECT COUNT(*) FROM results").use { it.simpleQueryForLong().toInt() }
     }
@@ -75,7 +77,7 @@ class SortingStore(cacheDir: File) : ResultStore {
     @Synchronized
     override fun readPage(start: Int, count: Int): List<SortingResult> {
         check(!closed)
-        return db.rawQuery("SELECT plate,type,note,street,district,date,walletType,location FROM results WHERE id > ? ORDER BY id LIMIT ?", arrayOf(start.toString(), count.toString())).use { cursor ->
+        return db.rawQuery("SELECT plate,type,note,street,district,date,walletType,location,walletModel FROM results WHERE id > ? ORDER BY id LIMIT ?", arrayOf(start.toString(), count.toString())).use { cursor ->
             buildList { while (cursor.moveToNext()) add(cursor.result()) }
         }
     }
@@ -101,15 +103,13 @@ class SortingStore(cacheDir: File) : ResultStore {
     @Synchronized
     override fun writeXlsx(output: OutputStream) {
         XlsxWriter.write(output, TSV_HEADER.split('\t')) { writeRow ->
-            forEachResult { result ->
-                writeRow(listOf(result.plate, result.type, result.note, result.street, result.district, result.date, result.walletType, result.location))
-            }
+            forEachResult { result -> writeRow(listOf(result.plate, result.type, result.walletModel, result.note, result.street, result.district, result.date, result.walletType, result.location)) }
         }
     }
 
     private fun forEachResult(block: (SortingResult) -> Unit) {
         check(!closed)
-        db.rawQuery("SELECT plate,type,note,street,district,date,walletType,location FROM results ORDER BY id", null).use { cursor ->
+        db.rawQuery("SELECT plate,type,note,street,district,date,walletType,location,walletModel FROM results ORDER BY id", null).use { cursor ->
             while (cursor.moveToNext()) block(cursor.result())
         }
     }
@@ -124,7 +124,7 @@ class SortingStore(cacheDir: File) : ResultStore {
         SQLiteDatabase.deleteDatabase(file)
     }
 
-    private fun Cursor.result() = SortingResult(getString(0), getString(1), getString(2), getString(3), getString(4), getString(5), getString(6), getString(7))
+    private fun Cursor.result() = SortingResult(getString(0), getString(1), getString(2), getString(3), getString(4), getString(5), getString(6), getString(7), getString(8))
 
     private fun SQLiteStatement.bindText(index: Int, value: String?) {
         if (value == null) bindNull(index) else bindString(index, value)
@@ -132,12 +132,12 @@ class SortingStore(cacheDir: File) : ResultStore {
 
     private fun value(row: Map<String, String>, aliases: Set<String>): String? {
         val exact = row.entries.firstOrNull { it.key.trim().replace(" ", "") in aliases }?.value
-        val color = row.entries.firstOrNull { it.key.replace(" ", "").contains("\u0644\u0648\u0646") }?.value
+        val color = row.entries.firstOrNull { it.key.replace(" ", "").contains("لون") }?.value
         return (exact ?: color)?.ifBlank { null }
     }
 
     companion object {
         const val PAGE_SIZE = 100
-        private const val TSV_HEADER = "اللوحة\tالنوع\tالملاحظة\tالشارع\tالحي\tالتاريخ\tاللون\tالموقع"
+        private const val TSV_HEADER = "اللوحة\tالنوع\tالطراز\tالملاحظة\tالشارع\tالحي\tالتاريخ\tاللون\tالموقع"
     }
 }

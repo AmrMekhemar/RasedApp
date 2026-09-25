@@ -18,9 +18,10 @@ data class SortingResult(
     val district: String?,
     val date: String?,
     val walletType: String?,
-    val location: String? = null
+    val location: String? = null,
+    val walletModel: String? = null
 ) {
     fun toTsvRow(): String = listOf(
-        plate, type.orEmpty(), note.orEmpty(), street.orEmpty(), district.orEmpty(), date.orEmpty(), walletType.orEmpty(), location.orEmpty()
+        plate, type.orEmpty(), walletModel.orEmpty(), note.orEmpty(), street.orEmpty(), district.orEmpty(), date.orEmpty(), walletType.orEmpty(), location.orEmpty()
     ).joinToString("\t")
 }

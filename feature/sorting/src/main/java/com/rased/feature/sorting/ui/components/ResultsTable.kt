@@ -42,6 +42,7 @@ private data class ResultColumn(
 private val resultColumns = listOf(
     ResultColumn("اللوحة", 140.dp) { it.plate },
     ResultColumn("النوع", 160.dp) { it.type },
+    ResultColumn("الطراز", 180.dp) { it.walletModel },
     ResultColumn("الملاحظة", 280.dp) { it.note },
     ResultColumn("الشارع", 180.dp) { it.street },
     ResultColumn("الحي", 160.dp) { it.district },

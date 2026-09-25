@@ -20,13 +20,13 @@ data class IndexedDataRow(
 
 @Entity(tableName = "sorting_wallet", primaryKeys = ["revision", "normalized"],
     indices = [Index(value = ["revision", "sequence"], unique = true)])
-data class IndexedWalletRow(val revision: String, val normalized: String, val sequence: Long, val walletType: String?, val location: String? = null)
+data class IndexedWalletRow(val revision: String, val normalized: String, val sequence: Long, val walletType: String?, val location: String? = null, val walletModel: String? = null)
 
 @Entity(tableName = "sorting_results", indices = [Index(value = ["runId", "id"])])
 data class IndexedResult(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val runId: String, val plate: String, val type: String?, val note: String?,
-    val street: String?, val district: String?, val date: String?, val walletType: String?, val location: String? = null
+    val street: String?, val district: String?, val date: String?, val walletType: String?, val location: String? = null, val walletModel: String? = null
 )
 
 @Dao
@@ -44,14 +44,14 @@ interface SortingDao {
     fun mergeData(source: String, target: String)
     @Query("DELETE FROM sorting_wallet WHERE revision = :revision") fun deleteWallet(revision: String)
 
-    @Query("""INSERT INTO sorting_results(runId,plate,type,note,street,district,date,walletType,location)
-        SELECT :runId,d.plate,d.type,d.note,d.street,d.district,d.date,w.walletType,COALESCE(d.location,w.location)
+    @Query("""INSERT INTO sorting_results(runId,plate,type,note,street,district,date,walletType,location,walletModel)
+        SELECT :runId,d.plate,d.type,d.note,d.street,d.district,d.date,w.walletType,COALESCE(d.location,w.location),w.walletModel
         FROM sorting_wallet w JOIN sorting_data d ON d.revision = :dataRevision AND d.normalized = w.normalized
         WHERE w.revision = :walletRevision ORDER BY w.sequence""")
     fun match(runId: String, dataRevision: String, walletRevision: String)
 
-    @Query("""INSERT INTO sorting_results(runId,plate,type,note,street,district,date,walletType,location)
-        SELECT :runId,d.plate,d.type,d.note,d.street,d.district,d.date,w.walletType,COALESCE(d.location,w.location)
+    @Query("""INSERT INTO sorting_results(runId,plate,type,note,street,district,date,walletType,location,walletModel)
+        SELECT :runId,d.plate,d.type,d.note,d.street,d.district,d.date,w.walletType,COALESCE(d.location,w.location),w.walletModel
         FROM sorting_wallet w JOIN sorting_data d ON d.revision = :dataRevision AND d.normalized = w.normalized
         WHERE w.revision = :walletRevision
         AND EXISTS (SELECT 1 FROM sorting_wallet c WHERE c.revision = :checkingRevision AND c.normalized = w.normalized) = :old
