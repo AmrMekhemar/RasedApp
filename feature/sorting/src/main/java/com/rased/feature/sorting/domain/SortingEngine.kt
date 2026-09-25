@@ -39,7 +39,7 @@ object SortingEngine {
             val dataRow = dataIndex[normalized] ?: return@forEach
             results += SortingResult(
                 plate = dataRow[dataPlateHeader].orEmpty(),
-                type = firstValueOrNull(dataRow, listOf("النوع")),
+                type = firstValueOrNull(dataRow, listOf("النوع", "نوع")),
                 note = firstValueOrNull(dataRow, listOf("الملاحظة", "ملاحظة", "الملاحظات")),
                 street = firstValueOrNull(dataRow, listOf("الشارع", "شارع")),
                 district = firstValueOrNull(dataRow, listOf("الحي", "حى")),

@@ -58,7 +58,7 @@ class SortingStore(cacheDir: File) : ResultStore {
         val plate = value(row, SortingEngine.plateNames())
         val normalized = PlateNormalizer.normalize(plate) ?: return
         matchUpdate.bindText(1, plate)
-        matchUpdate.bindText(2, value(row, setOf("النوع")))
+        matchUpdate.bindText(2, value(row, setOf("النوع", "نوع")))
         matchUpdate.bindText(3, value(row, setOf("الملاحظة", "ملاحظة", "الملاحظات")))
         matchUpdate.bindText(4, value(row, setOf("الشارع", "شارع")))
         matchUpdate.bindText(5, value(row, setOf("الحي", "حى")))

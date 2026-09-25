@@ -56,12 +56,12 @@ internal fun SortingResultCard(result: SortingResult) {
             verticalArrangement = Arrangement.spacedBy(6.dp)) {
             ResultCardHeader(result)
             if (hasFooter) ResultCardFooter(result)
-            if (hasDetails && !result.note.isNullOrBlank()) {
-                Text(buildAnnotatedString {
-                    withStyle(SpanStyle(color = CardMuted)) { append("الملاحظة: ") }
-                    append(result.note)
-                }, color = CardInk, style = MaterialTheme.typography.bodySmall)
-            }
+//            if (hasDetails && !result.note.isNullOrBlank()) {
+//                Text(buildAnnotatedString {
+//                    withStyle(SpanStyle(color = CardMuted)) { append("الملاحظة: ") }
+//                    append(result.note)
+//                }, color = CardInk, style = MaterialTheme.typography.bodySmall)
+//            }
 //            if (hasDetails) {
 ////                HorizontalDivider(color = CardLine)
 //                TextButton(
@@ -134,15 +134,16 @@ private fun ResultCardHeader(result: SortingResult) {
                 }
             }
         }
-        if (!result.type.isNullOrBlank() || !result.walletModel.isNullOrBlank() || !result.walletType.isNullOrBlank()) {
+        if (true) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Icon(painterResource(R.drawable.ic_result_truck), null, tint = CardMuted,
                     modifier = Modifier.size(18.dp))
                 Text(buildAnnotatedString {
                     val fields = listOf(
-                        "النوع" to result.type,
+                        "النوع" to (result.type?.takeIf { it.isNotBlank() } ?: "-"),
                         "الطراز" to result.walletModel,
+                        "الملاحظة" to result.note,
                         "اللون" to result.walletType,
                         "الشارع" to result.street,
                         "الحي" to result.district

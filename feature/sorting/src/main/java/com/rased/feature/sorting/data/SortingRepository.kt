@@ -294,11 +294,11 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
 
     private companion object {
         val operationMutex = Mutex()
-        const val PARSER_VERSION = 11
+        const val PARSER_VERSION = 12
         const val IMPORT_BATCH_SIZE = 512
         val DATA_COLUMNS = listOf(
             SortingEngine.plateNames(),
-            setOf("النوع"),
+            setOf("النوع", "نوع"),
             setOf("الملاحظة", "ملاحظة", "الملاحظات"),
             setOf("الشارع", "شارع"),
             setOf("الحي", "حى"),
