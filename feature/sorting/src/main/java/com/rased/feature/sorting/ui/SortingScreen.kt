@@ -124,6 +124,9 @@ fun SortingScreen(
                     if (state.isManagingFiles) {
                         item { Text(state.fileProgress ?: "جاري تجهيز الملفات المحفوظة...", color = MaterialTheme.colorScheme.primary) }
                     }
+                    if (state.isManagingFiles && state.fileProgress != null) {
+                        item { SortingStatus(true, state.fileProgress) }
+                    }
                     if (state.isLoading || state.message != null) {
                         item { SortingStatus(state.isLoading, state.message) }
                     }

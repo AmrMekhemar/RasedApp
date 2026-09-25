@@ -6,6 +6,9 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.util.Log
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import androidx.core.content.FileProvider
 import java.io.File
 import androidx.lifecycle.AndroidViewModel
@@ -45,6 +48,11 @@ class SortingViewModel @JvmOverloads constructor(
     private val savedFiles = SavedFileStorage(application)
     private val fileMutex = Mutex()
     private var pendingFileOperations = 1
+    private var activeFileName: String = "الملف"
+    private val progressNotificationId = 7412
+    private val notificationManager by lazy {
+        getApplication<Application>().getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    }
 
     init {
         viewModelScope.launch {
@@ -79,6 +87,7 @@ class SortingViewModel @JvmOverloads constructor(
                     Log.e("SortingViewModel", "Cannot restore saved inputs", failure)
                     _state.update { it.copy(message = "تعذر استعادة الملفات المحفوظة") }
                 } finally {
+                    finishFileNotification()
                     finishFileOperation()
                 }
             }
@@ -104,7 +113,8 @@ class SortingViewModel @JvmOverloads constructor(
 
     private fun importSecondData(uri: Uri) {
         pendingFileOperations++
-        _state.update { it.copy(isManagingFiles = true, message = null) }
+        activeFileName = uri.lastPathSegment ?: "الملف"
+        showFileProgress(0)
         viewModelScope.launch {
             fileMutex.withLock {
                 try {
@@ -114,7 +124,10 @@ class SortingViewModel @JvmOverloads constructor(
                 } catch (cancelled: CancellationException) { throw cancelled
                 } catch (failure: Exception) {
                     _state.update { it.copy(message = "تعذر استيراد ملف الداتا الثاني. ${failure.message.orEmpty()}") }
-                } finally { finishFileOperation() }
+                } finally {
+                    finishFileNotification()
+                    finishFileOperation()
+                }
             }
         }
     }
@@ -181,7 +194,8 @@ class SortingViewModel @JvmOverloads constructor(
             return
         }
         pendingFileOperations++
-        _state.update { it.copy(isManagingFiles = true, message = null) }
+        activeFileName = uri.lastPathSegment ?: "الملف"
+        showFileProgress(0)
         viewModelScope.launch {
             fileMutex.withLock {
                 _state.update { it.copy(isManagingFiles = true) }
@@ -201,6 +215,7 @@ class SortingViewModel @JvmOverloads constructor(
                     Log.e("SortingViewModel", "Cannot replace sorting input (isData=$isData)", failure)
                     _state.update { it.copy(message = "تعذر حفظ الملف الجديد؛ لم يتم تغيير الملف السابق. ${failure.message.orEmpty()}") }
                 } finally {
+                    finishFileNotification()
                     finishFileOperation()
                 }
             }
@@ -212,8 +227,33 @@ class SortingViewModel @JvmOverloads constructor(
     }
 
     private fun importProgress(isData: Boolean, rows: Int) {
-        val label = if (isData) "الداتا" else "المحفظة"
-        _state.update { it.copy(fileProgress = "جاري استيراد $label: $rows صف") }
+        showFileProgress(rows)
+    }
+
+    private fun showFileProgress(rows: Int) {
+        val text = "جاري إضافة وفهرسة $activeFileName${if (rows > 0) ": $rows صف" else "..."}"
+        _state.update { it.copy(isManagingFiles = true, message = null, fileProgress = text) }
+        runCatching {
+            if (android.os.Build.VERSION.SDK_INT >= 26) {
+                notificationManager.createNotificationChannel(
+                    NotificationChannel("sorting_import", "استيراد الملفات", NotificationManager.IMPORTANCE_LOW)
+                )
+            }
+            val notification = if (android.os.Build.VERSION.SDK_INT >= 26) {
+                Notification.Builder(getApplication(), "sorting_import")
+            } else Notification.Builder(getApplication())
+            notification.setSmallIcon(android.R.drawable.stat_sys_upload)
+                .setContentTitle("إضافة ملف")
+                .setContentText(text)
+                .setOngoing(true)
+                .setProgress(0, 0, true)
+                .build()
+                .also { notificationManager.notify(progressNotificationId, it) }
+        }.onFailure { Log.d("SortingViewModel", "Progress notification unavailable", it) }
+    }
+
+    private fun finishFileNotification() {
+        runCatching { notificationManager.cancel(progressNotificationId) }
     }
 
     fun setUseTextWallet(value: Boolean) = _state.update { it.copy(useTextWallet = value, message = null) }
