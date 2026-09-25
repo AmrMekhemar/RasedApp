@@ -30,6 +30,9 @@ fun SortingRoute(onBack: () -> Unit, viewModel: SortingViewModel = viewModel()) 
     val walletPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(viewModel::setWalletFile)
     }
+    val checkingPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let(viewModel::setCheckingFile)
+    }
     val resultsSaver = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) { uri ->
         uri?.let(viewModel::exportResults)
     }
@@ -42,7 +45,7 @@ fun SortingRoute(onBack: () -> Unit, viewModel: SortingViewModel = viewModel()) 
             state = state,
             onBack = viewModel::closeResults,
             onCopyResults = viewModel::copyResults,
-            onSaveResults = { resultsSaver.launch("Rased-results.xlsx") },
+            onSaveResults = { resultsSaver.launch(if (state.showingOld) "Rased-old-results.xlsx" else "Rased-new-results.xlsx") },
             onShareResults = {
                 viewModel.shareResults { uri ->
                     val intent = Intent(Intent.ACTION_SEND).apply {
@@ -54,7 +57,8 @@ fun SortingRoute(onBack: () -> Unit, viewModel: SortingViewModel = viewModel()) 
                     context.startActivity(Intent.createChooser(intent, "مشاركة النتائج Excel"))
                 }
             },
-            onVisibleRow = viewModel::loadVisibleRows
+            onVisibleRow = viewModel::loadVisibleRows,
+            onSelectResults = viewModel::selectResults
         )
     } else {
         SortingScreen(
@@ -65,7 +69,9 @@ fun SortingRoute(onBack: () -> Unit, viewModel: SortingViewModel = viewModel()) 
             onUseTextWalletChange = viewModel::setUseTextWallet,
             onWalletTextChange = viewModel::setWalletText,
             onStartSorting = viewModel::startSorting,
-            onShowResults = viewModel::openResults
+            onShowResults = viewModel::openResults,
+            onPickChecking = { checkingPicker.launch(excelMimeTypes) },
+            onRemoveChecking = viewModel::removeCheckingFile
         )
     }
 }

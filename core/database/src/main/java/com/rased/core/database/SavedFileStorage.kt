@@ -21,6 +21,20 @@ class SavedFileStorage(context: Context) {
 
     fun uri(file: SavedFile): Uri = Uri.fromFile(File(directory, file.fileName))
 
+    suspend fun remove(slot: String, beforeCommit: () -> Unit = {}) = withContext(Dispatchers.IO) {
+        replacementMutex.withLock {
+            val previous = dao.get(slot)
+            val job = currentCoroutineContext()
+            RasedDatabase.getInstance(context).runInTransaction {
+                beforeCommit()
+                job.ensureActive()
+                dao.delete(slot)
+            }
+            previous?.let { File(directory, it.fileName).delete() }
+            Unit
+        }
+    }
+
     suspend fun replace(
         slot: String,
         source: Uri,

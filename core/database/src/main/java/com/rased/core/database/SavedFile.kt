@@ -22,4 +22,7 @@ interface SavedFileDao {
 
     @Upsert
     fun upsert(file: SavedFile)
+
+    @Query("DELETE FROM saved_files WHERE slot = :slot")
+    fun delete(slot: String)
 }

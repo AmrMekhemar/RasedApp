@@ -62,7 +62,7 @@ class XlsxReader(private val context: Context) {
             }
             ZipFile(file).use { zip ->
                 val target = findSheetTarget(zip, sheetName)
-                    ?: error(if (sheetName == null) "لم يتم العثور على أول شيت في الملف" else "لم يتم العثور على شيت باسم \"$sheetName\"")
+                    ?: error(if (sheetName == null) "لم يتم العثور على شيت ظاهر في الملف" else "لم يتم العثور على شيت باسم \"$sheetName\"")
                 SharedStrings(context.cacheDir).use { sharedStrings ->
                     zip.getEntry("xl/sharedStrings.xml")?.let { entry ->
                         zip.getInputStream(entry).use { parseSharedStrings(it, sharedStrings, checkActive) }
@@ -72,22 +72,18 @@ class XlsxReader(private val context: Context) {
                     val aliases = headerAliases.map(::normalizeHeader).toSet()
                     val selected = selectedHeaders?.map(::normalizeHeader)?.toSet()
                     var headers: Map<Int, String>? = null
-                    var rowCount = 0
                     SheetHyperlinks(context.cacheDir).use { links ->
                     links.load(zip, target, checkActive)
                     zip.getInputStream(entry).use { input ->
                         parseSheet(input, sharedStrings, { column -> headers?.containsKey(column) != false },
                             { column -> headers?.get(column)?.let(::normalizeHeader) in setOf("الموقع", "موقع") },
                             links::target, checkActive) { row ->
-                            rowCount++
                             val currentHeaders = headers
                             if (currentHeaders == null) {
-                                if (rowCount <= 25 && row.values.any { normalizeHeader(it) in aliases }) {
+                                if (row.values.any { normalizeHeader(it) in aliases }) {
                                     headers = row.mapValues { it.value.trim() }.filterValues {
                                         it.isNotBlank() && (selected == null || normalizeHeader(it) in selected)
                                     }
-                                } else if (rowCount >= 25) {
-                                    error("لم يتم العثور على صف العناوين أو عمود اللوحة")
                                 }
                             } else {
                                 val mapped = linkedMapOf<String, String>()
@@ -97,7 +93,7 @@ class XlsxReader(private val context: Context) {
                         }
                     }
                     }
-                    if (headers == null) error("لم يتم العثور على صف العناوين أو عمود اللوحة")
+                    if (headers == null) error("لم يتم العثور على عمود اللوحة في الشيت. يجب وجود عنوان مثل «اللوحة» أو «رقم اللوحة»؛ باقي الأعمدة اختيارية.")
                 }
             }
         } finally {
@@ -119,7 +115,9 @@ class XlsxReader(private val context: Context) {
                     val rid = parser.getAttributeValue("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id")
                         ?: parser.getAttributeValue(null, "r:id")
                         ?: parser.getAttributeValue(null, "id")
-                    if (wantedName == null || name?.trim() == wantedName.trim()) {
+                    val state = parser.getAttributeValue(null, "state")
+                    val visible = state != "hidden" && state != "veryHidden"
+                    if ((wantedName == null && visible) || (wantedName != null && name?.trim() == wantedName.trim())) {
                         resultRid = rid
                         break
                     }
@@ -167,7 +165,7 @@ class XlsxReader(private val context: Context) {
                 XmlPullParser.END_TAG -> {
                     if (parser.name.endsWith("si")) {
                         checkActive()
-                        strings.add(builder.toString())
+                        strings.add(decodeExcelText(builder.toString()))
                         inSi = false
                     }
                 }
@@ -211,17 +209,18 @@ class XlsxReader(private val context: Context) {
                         val value = parser.nextText().trim()
                         val resolved = when (currentType) {
                             "s" -> value.toIntOrNull()?.let { sharedStrings.getOrNull(it) }.orEmpty()
+                            "str" -> decodeExcelText(value)
                             else -> value
                         }
                         if (currentColumn >= 0 && resolved.isNotBlank()) currentRow[currentColumn] = resolved
                     }
                     "t" -> {
-                        if (currentType == "inlineStr" && selectedColumn(currentColumn)) inlineText = parser.nextText().trim()
+                        if (currentType == "inlineStr" && selectedColumn(currentColumn)) inlineText = inlineText.orEmpty() + parser.nextText()
                     }
                 }
                 XmlPullParser.END_TAG -> when (parser.name.substringAfter(':')) {
                     "c" -> {
-                        if (currentColumn >= 0 && !inlineText.isNullOrBlank()) currentRow[currentColumn] = inlineText.orEmpty()
+                        if (currentColumn >= 0 && !inlineText.isNullOrBlank()) currentRow[currentColumn] = decodeExcelText(inlineText.orEmpty())
                         if (hyperlinkColumn(currentColumn)) {
                             (hyperlinkTarget(currentRef) ?: formulaTarget)?.takeIf { it.isNotBlank() }?.let {
                                 currentRow[currentColumn] = it
@@ -308,7 +307,14 @@ class XlsxReader(private val context: Context) {
         }
     }
 
-    private fun normalizeHeader(value: String): String = value.trim().replace(" ", "")
+    private fun normalizeHeader(value: String): String = ExcelHeaders.normalize(value)
+
+    // Decode once so an escaped literal such as _x005F_x000A_ stays literal.
+    private fun decodeExcelText(value: String): String = excelEscape.replace(value) {
+        it.groupValues[1].toInt(16).toChar().toString()
+    }
+
+    private val excelEscape = Regex("_x([0-9a-fA-F]{4})_")
 
     private fun columnIndexFromCellRef(ref: String): Int {
         val letters = ref.takeWhile { it.isLetter() }

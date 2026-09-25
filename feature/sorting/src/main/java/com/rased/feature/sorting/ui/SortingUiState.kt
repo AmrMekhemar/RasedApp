@@ -4,6 +4,11 @@ import android.net.Uri
 import com.rased.feature.sorting.domain.SortingResult
 
 data class SortingUiState(
+    val checkingFileUri: Uri? = null,
+    val checkingFileName: String? = null,
+    val showingOld: Boolean = false,
+    val newCount: Int = 0,
+    val oldCount: Int = 0,
     val dataFileUri: Uri? = null,
     val walletFileUri: Uri? = null,
     val dataFileName: String? = null,

@@ -10,7 +10,12 @@ import androidx.compose.runtime.Composable
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FeatureScaffold(title: String, onBack: () -> Unit, content: @Composable (PaddingValues) -> Unit) {
+fun FeatureScaffold(
+    title: String,
+    onBack: () -> Unit,
+    bottomBar: @Composable () -> Unit = {},
+    content: @Composable (PaddingValues) -> Unit
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -18,6 +23,7 @@ fun FeatureScaffold(title: String, onBack: () -> Unit, content: @Composable (Pad
                 navigationIcon = { TextButton(onClick = onBack) { Text("رجوع") } }
             )
         },
+        bottomBar = bottomBar,
         content = content
     )
 }

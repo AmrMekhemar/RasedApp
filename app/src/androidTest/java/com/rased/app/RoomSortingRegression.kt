@@ -20,6 +20,8 @@ class RoomSortingRegression(private val context: Context) {
         if (!verifyAfterRestart) {
             verifyMigration()
             verifyInputRecovery()
+            verifyCheckingSplit()
+            verifyPlateOnlyInputs()
         }
         val repository = SortingRepository(context, "room.regression")
         val files = SavedFileStorage(context)
@@ -117,6 +119,97 @@ class RoomSortingRegression(private val context: Context) {
             check(restored.count == 1)
             check(it.readPage(0, 100).single().note == "updated")
             check(it.readPage(0, 100).single().walletType == "replacement")
+        }
+    }
+
+    private suspend fun verifyPlateOnlyInputs() {
+        val repository = SortingRepository(context, "room.plate.only")
+        val source = File.createTempFile("plate-only-", ".xlsx", context.cacheDir)
+        try {
+            val aliases = listOf("اللوحة", "اللوحه", "لوحة", "لوحه", "رقم اللوحة", "رقم اللوحه", "\u200Fرقم\u00A0اللوحة\uFEFF", "اللَّـوحة", "رقم\nاللوحة")
+            for (header in aliases) {
+                // The plate column may be the sole column and may follow a long preamble.
+                write(source, listOf("تقرير"), List(30) { listOf("مقدمة") } + listOf(listOf(header), listOf("أ ب ج ١٢٣٤")))
+                repository.replaceInput(Uri.fromFile(source), true)
+                repository.replaceInput(Uri.fromFile(source), false)
+                repository.replaceChecking(Uri.fromFile(source))
+                val result = repository.sort(useChecking = true)
+                result.store.use { check(result.count == 0) }
+                requireNotNull(result.oldStore).use {
+                    check(result.oldCount == 1)
+                    val row = it.readPage(0, 10).single()
+                    check(row.plate == "أ ب ج ١٢٣٤")
+                    check(listOf(row.type, row.note, row.street, row.district, row.date, row.walletType, row.location).all { value -> value == null })
+                }
+            }
+            write(source, listOf("النوع"), listOf(listOf("سيارة")))
+            check(runCatching { repository.replaceInput(Uri.fromFile(source), true) }.isFailure)
+            check(runCatching { repository.replaceInput(Uri.fromFile(source), false) }.isFailure)
+            check(runCatching { repository.replaceChecking(Uri.fromFile(source)) }.isFailure)
+        } finally { source.delete() }
+    }
+
+    private suspend fun verifyCheckingSplit() {
+        val repository = SortingRepository(context, "room.checking.regression")
+        val source = File.createTempFile("checking-source-", ".xlsx", context.cacheDir)
+        val export = File.createTempFile("checking-export-", ".xlsx", context.cacheDir)
+        try {
+            write(source, listOf("اللوحة"), listOf(listOf("ابج1234"), listOf("دهو5678"), listOf("زحط9999")))
+            repository.replaceInput(Uri.fromFile(source), true)
+            repository.replaceInput(Uri.fromFile(source), false)
+            write(source, listOf("اللوحة"), listOf(listOf("أ ب ج ١٢٣٤"), listOf("ابج1234"), listOf("زحط9999")))
+            repository.replaceChecking(Uri.fromFile(source))
+            check(repository.loadChecking() != null)
+            val result = repository.sort(useChecking = true)
+            result.store.use { recent ->
+                requireNotNull(result.oldStore).use { old ->
+                    check(result.count == 1 && result.oldCount == 2)
+                    check(recent.readPage(0, 10).map { it.plate } == listOf("دهو5678"))
+                    check(old.readPage(0, 10).map { it.plate } == listOf("ابج1234", "زحط9999"))
+                    check(old.readPage(1, 1).single().plate == "زحط9999")
+                    for (store in listOf(recent, old)) {
+                        export.outputStream().use(store::writeXlsx)
+                        val rows = XlsxReader(context).readSheet(Uri.fromFile(export), null, SortingEngine.plateNames())
+                        check(rows.map { it["اللوحة"] } == store.readPage(0, 10).map { it.plate })
+                    }
+                    check(!recent.copyText().contains("ابج1234"))
+                    check(!old.copyText().contains("دهو5678"))
+                    write(source, listOf("اللوحة"), emptyList())
+                    repository.replaceChecking(Uri.fromFile(source))
+                    check(old.readPage(0, 10).size == 2)
+                }
+            }
+            val emptyCheck = repository.sort(useChecking = true)
+            emptyCheck.store.use { check(emptyCheck.count == 3) }
+            requireNotNull(emptyCheck.oldStore).use { check(emptyCheck.oldCount == 0) }
+            val textWallet = repository.sort("ابج1234", useChecking = true)
+            textWallet.store.use { check(textWallet.count == 1) }
+            requireNotNull(textWallet.oldStore).close()
+            val files = SavedFileStorage(context)
+            val checking = requireNotNull(files.get("room.checking.regression.checking"))
+            val data = files.get("room.checking.regression.data")
+            val wallet = files.get("room.checking.regression.wallet")
+            repository.removeChecking()
+            check(files.get("room.checking.regression.checking") == null)
+            check(!File(requireNotNull(files.uri(checking).path)).exists())
+            check(files.get("room.checking.regression.data") == data)
+            check(files.get("room.checking.regression.wallet") == wallet)
+            val restored = SortingRepository(context, "room.checking.regression")
+            check(restored.loadChecking() == null)
+            restored.loadInputs()
+            val withoutChecking = restored.sort()
+            withoutChecking.store.use { check(withoutChecking.count == 3) }
+            check(withoutChecking.oldCount == 0 && withoutChecking.oldStore == null)
+            // Removing again is harmless; selecting a new file still works.
+            restored.removeChecking()
+            write(source, listOf("اللوحة"), listOf(listOf("ابج1234")))
+            restored.replaceChecking(Uri.fromFile(source))
+            val addedAgain = restored.sort(useChecking = true)
+            addedAgain.store.use { check(addedAgain.count == 2) }
+            requireNotNull(addedAgain.oldStore).use { check(addedAgain.oldCount == 1) }
+        } finally {
+            source.delete()
+            export.delete()
         }
     }
 

@@ -1,7 +1,9 @@
 package com.rased.feature.sorting.domain
 
+import com.rased.core.excel.ExcelHeaders
+
 object SortingEngine {
-    private val plateColumnNames = setOf("اللوحة", "اللوحه", "لوحة", "لوحه")
+    private val plateColumnNames = setOf("اللوحة", "اللوحه", "لوحة", "لوحه", "رقم اللوحة", "رقم اللوحه", "رقم لوحة", "رقم لوحه")
     private val walletTypeNames = setOf("النوع", "الماركة", "الموديل")
 
     fun locationNames(): Set<String> = setOf("الموقع", "موقع")
@@ -32,7 +34,7 @@ object SortingEngine {
 
             val dataRow = dataIndex[normalized] ?: return@forEach
             results += SortingResult(
-                plate = firstValue(dataRow, listOf("اللوحة", "اللوحه", "لوحة", "لوحه")),
+                plate = dataRow[dataPlateHeader].orEmpty(),
                 type = firstValueOrNull(dataRow, listOf("النوع")),
                 note = firstValueOrNull(dataRow, listOf("الملاحظة", "ملاحظة", "الملاحظات")),
                 street = firstValueOrNull(dataRow, listOf("الشارع", "شارع")),
@@ -67,7 +69,7 @@ object SortingEngine {
         return headers.firstOrNull { header -> normalizeHeader(header) in aliases.map(::normalizeHeader) }
     }
 
-    private fun normalizeHeader(value: String): String = value.trim().replace(" ", "")
+    private fun normalizeHeader(value: String): String = ExcelHeaders.normalize(value)
 
     private fun firstValue(row: Map<String, String>, names: List<String>): String = firstValueOrNull(row, names).orEmpty()
 

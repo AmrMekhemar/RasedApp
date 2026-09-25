@@ -15,17 +15,40 @@ class XlsxRegressionInstrumentation : Instrumentation() {
     private var persistenceMode: String? = null
     private var benchmark = false
     private var roomMode: String? = null
+    private var walletFile: String? = null
     override fun onCreate(arguments: Bundle?) {
         super.onCreate(arguments)
         persistenceMode = arguments?.getString("persistence")
         benchmark = arguments?.getString("benchmark") == "sorting"
         roomMode = arguments?.getString("room")
+        walletFile = arguments?.getString("walletFile")
         start()
     }
 
     override fun onStart() {
         val result = Bundle()
         try {
+            walletFile?.let { path ->
+                val reader = XlsxReader(targetContext)
+                val uri = Uri.fromFile(File(path))
+                val automatic = reader.readSheet(uri, null, SortingEngine.plateNames())
+                val visible = reader.readSheet(uri, "Sheet3", SortingEngine.plateNames())
+                check(automatic.isNotEmpty() && automatic == visible)
+                val expected = automatic.mapNotNull { row ->
+                    row.entries.firstOrNull { com.rased.core.excel.ExcelHeaders.normalize(it.key) == "اللوحة" }
+                        ?.value?.let(com.rased.feature.sorting.domain.PlateNormalizer::normalize)
+                }.toSet()
+                kotlinx.coroutines.runBlocking {
+                    val repository = com.rased.feature.sorting.data.SortingRepository(targetContext, "wallet.file.regression")
+                    repository.replaceInput(uri, true)
+                    repository.replaceInput(uri, false)
+                    val sorted = repository.sort()
+                    sorted.store.use { check(sorted.count == expected.size) }
+                }
+                result.putString("stream", "PASS: supplied wallet imports visible Sheet3; ${automatic.size} rows, ${expected.size} unique valid plates\n")
+                finish(Activity.RESULT_OK, result)
+                return
+            }
             roomMode?.let {
                 if (it == "links") {
                     HyperlinkRegression(targetContext).run()

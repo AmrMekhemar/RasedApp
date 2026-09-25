@@ -9,6 +9,7 @@ import com.rased.core.database.SavedFile
 import com.rased.core.database.SavedFileStorage
 import com.rased.core.database.SortingImport
 import com.rased.core.excel.XlsxReader
+import com.rased.core.excel.ExcelHeaders
 import com.rased.feature.sorting.domain.PlateNormalizer
 import com.rased.feature.sorting.domain.SortingEngine
 import java.util.UUID
@@ -66,6 +67,34 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
             }
         }
 
+    suspend fun removeChecking() = withContext(Dispatchers.IO) {
+        operationMutex.withLock {
+            val slot = "$slotPrefix.checking"
+            files.remove(slot) {
+                dao.imported(slot)?.let { dao.deleteWallet(it.revision) }
+                dao.deleteImport(slot)
+            }
+        }
+    }
+
+    suspend fun loadChecking(): SavedFile? = withContext(Dispatchers.IO) {
+        operationMutex.withLock {
+            val saved = files.get("$slotPrefix.checking") ?: return@withLock null
+            val job = currentCoroutineContext()
+            database.runInTransaction { ensureImported(saved, false, { job.ensureActive() }) { _, _ -> } }
+            saved
+        }
+    }
+
+    suspend fun replaceChecking(uri: Uri): SavedFile = withContext(Dispatchers.IO) {
+        operationMutex.withLock {
+            val job = currentCoroutineContext()
+            files.replace("$slotPrefix.checking", uri) { saved, _ ->
+                ensureImported(saved, false, { job.ensureActive() }) { _, _ -> }
+            }
+        }
+    }
+
     private fun ensureImported(saved: SavedFile, isData: Boolean, checkActive: () -> Unit, progress: (Boolean, Int) -> Unit) {
         val revision = "${saved.fileName}:$PARSER_VERSION"
         val previous = dao.imported(saved.slot)
@@ -81,7 +110,10 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
         progress(isData, 0)
         reader.forEachSelectedRow(files.uri(saved), null, SortingEngine.plateNames(), aliases.flatten().toSet(), checkActive) { row ->
             checkActive()
-            if (keys == null) keys = aliases.map { names -> row.keys.firstOrNull { normalizeHeader(it) in names } }
+            if (keys == null) keys = aliases.map { names ->
+                val normalizedNames = names.map(::normalizeHeader).toSet()
+                row.keys.firstOrNull { normalizeHeader(it) in normalizedNames }
+            }
             val values = keys!!.map { key -> key?.let(row::get)?.takeIf { it.isNotBlank() } }
             val plate = values[0]
             val normalized = PlateNormalizer.normalize(plate)
@@ -104,21 +136,22 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
         progress(isData, sequence.toInt())
     }
 
-    suspend fun sort(walletText: String? = null): CompletedSorting {
+    suspend fun sort(walletText: String? = null, useChecking: Boolean = false): CompletedSorting {
         var completed: CompletedSorting? = null
         try {
             return withContext(Dispatchers.IO) {
-                createSnapshot(walletText).also { completed = it }
+                createSnapshot(walletText, useChecking).also { completed = it }
             }
         } catch (failure: Throwable) {
             // Cancellation can happen while dispatching a finished snapshot back to the UI.
-            withContext(NonCancellable + Dispatchers.IO) { completed?.store?.close() }
+            withContext(NonCancellable + Dispatchers.IO) { completed?.let { it.store.close(); it.oldStore?.close() } }
             throw failure
         }
     }
 
-    private suspend fun createSnapshot(walletText: String?): CompletedSorting = operationMutex.withLock {
+    private suspend fun createSnapshot(walletText: String?, useChecking: Boolean): CompletedSorting = operationMutex.withLock {
             val runId = UUID.randomUUID().toString()
+            val oldRunId = UUID.randomUUID().toString()
             val job = currentCoroutineContext()
             var result: RoomResultStore? = null
             try {
@@ -136,16 +169,21 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
                         if (batch.isNotEmpty()) dao.insertWallet(batch)
                         runId
                     } else requireNotNull(dao.imported("$slotPrefix.wallet")) { "اختر ملف المحفظة أولًا" }.revision
-                    dao.match(runId, data.revision, walletRevision)
+                    if (useChecking) {
+                        val checking = requireNotNull(dao.imported("$slotPrefix.checking")) { "اختر ملف التشييك أولًا" }
+                        dao.matchChecked(runId, data.revision, walletRevision, checking.revision, false)
+                        dao.matchChecked(oldRunId, data.revision, walletRevision, checking.revision, true)
+                    } else dao.match(runId, data.revision, walletRevision)
                     if (walletText != null) dao.deleteWallet(runId)
                     count = dao.count(runId)
                     job.ensureActive()
                 }
                 result = RoomResultStore(dao, runId)
                 job.ensureActive()
-                CompletedSorting(result, count)
+                CompletedSorting(result, count, if (useChecking) RoomResultStore(dao, oldRunId) else null, dao.count(oldRunId))
             } catch (failure: Throwable) {
                 if (result != null) result.close() else dao.deleteResults(runId)
+                dao.deleteResults(oldRunId)
                 throw failure
             }
     }
@@ -156,11 +194,11 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
 
     private companion object {
         val operationMutex = Mutex()
-        const val PARSER_VERSION = 3
+        const val PARSER_VERSION = 5
         val DATA_COLUMNS = listOf(SortingEngine.plateNames(), setOf("النوع"), setOf("الملاحظة", "ملاحظة", "الملاحظات"),
             setOf("الشارع", "شارع"), setOf("الحي", "حى"), setOf("التاريخ", "تاريخ"), SortingEngine.locationNames())
-        fun normalizeHeader(value: String) = value.trim().replace(" ", "")
+        fun normalizeHeader(value: String) = ExcelHeaders.normalize(value)
     }
 }
 
-data class CompletedSorting(val store: ResultStore, val count: Int)
+data class CompletedSorting(val store: ResultStore, val count: Int, val oldStore: ResultStore? = null, val oldCount: Int = 0)

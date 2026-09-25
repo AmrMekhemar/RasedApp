@@ -37,6 +37,7 @@ class SortingViewModel @JvmOverloads constructor(
     private val _state = MutableStateFlow(SortingUiState())
     val state: StateFlow<SortingUiState> = _state.asStateFlow()
     private var store: ResultStore? = null
+    private var oldStore: ResultStore? = null
     private val storeMutex = Mutex()
     private var pageJob: Job? = null
     private var requestedStart = 0
@@ -63,6 +64,13 @@ class SortingViewModel @JvmOverloads constructor(
                         walletFileUri = wallet?.let(savedFiles::uri), walletFileName = wallet?.displayName,
                         message = restoreErrors.takeIf { it.isNotEmpty() }?.joinToString("\n")
                     ) }
+                    try {
+                        val checking = repository.loadChecking()
+                        _state.update { it.copy(checkingFileUri = checking?.let(savedFiles::uri), checkingFileName = checking?.displayName) }
+                    } catch (cancelled: CancellationException) { throw cancelled
+                    } catch (failure: Exception) {
+                        _state.update { it.copy(message = "تعذر استعادة ملف التشييك؛ اختر الملف مجددًا") }
+                    }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (failure: Exception) {
@@ -78,7 +86,40 @@ class SortingViewModel @JvmOverloads constructor(
     fun setDataFile(uri: Uri?) = saveInputFile(uri, isData = true)
     fun setWalletFile(uri: Uri?) = saveInputFile(uri, isData = false)
 
-    private fun saveInputFile(uri: Uri?, isData: Boolean) {
+    fun setCheckingFile(uri: Uri?) = saveInputFile(uri, isData = false, isChecking = true)
+
+    fun removeCheckingFile() {
+        if (_state.value.isLoading || _state.value.isExporting || _state.value.isManagingFiles) return
+        pendingFileOperations++
+        _state.update { it.copy(isManagingFiles = true, message = null) }
+        viewModelScope.launch {
+            fileMutex.withLock {
+                try {
+                    repository.removeChecking()
+                    pageJob?.cancel()
+                    withContext(Dispatchers.IO) {
+                        storeMutex.withLock {
+                            store?.close()
+                            oldStore?.close()
+                            store = null
+                            oldStore = null
+                        }
+                    }
+                    _state.update { it.copy(checkingFileUri = null, checkingFileName = null,
+                        hasCompletedSorting = false, showResults = false, showingOld = false,
+                        results = emptyList(), resultCount = 0, resultStart = 0, newCount = 0, oldCount = 0) }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    _state.update { it.copy(message = "تعذر إزالة ملف التشييك. ${failure.message.orEmpty()}") }
+                } finally {
+                    finishFileOperation()
+                }
+            }
+        }
+    }
+
+    private fun saveInputFile(uri: Uri?, isData: Boolean, isChecking: Boolean = false) {
         if (uri == null) return
         if (_state.value.isLoading || _state.value.isExporting) {
             _state.update { it.copy(message = "انتظر انتهاء العملية ثم اختر الملف الجديد") }
@@ -90,9 +131,10 @@ class SortingViewModel @JvmOverloads constructor(
             fileMutex.withLock {
                 _state.update { it.copy(isManagingFiles = true) }
                 try {
-                    val saved = repository.replaceInput(uri, isData, ::importProgress)
+                    val saved = if (isChecking) repository.replaceChecking(uri) else repository.replaceInput(uri, isData, ::importProgress)
                     _state.update {
-                        if (isData) it.copy(dataFileUri = savedFiles.uri(saved), dataFileName = saved.displayName)
+                        if (isChecking) it.copy(checkingFileUri = savedFiles.uri(saved), checkingFileName = saved.displayName)
+                        else if (isData) it.copy(dataFileUri = savedFiles.uri(saved), dataFileName = saved.displayName)
                         else it.copy(walletFileUri = savedFiles.uri(saved), walletFileName = saved.displayName)
                     }
                 } catch (cancelled: CancellationException) {
@@ -145,27 +187,33 @@ class SortingViewModel @JvmOverloads constructor(
             results = emptyList(), resultCount = 0, resultStart = 0, message = null) }
         viewModelScope.launch(Dispatchers.IO) {
             var pending: ResultStore? = null
+            var pendingOld: ResultStore? = null
             try {
                 storeMutex.withLock {
                     store?.close()
+                    oldStore?.close()
+                    oldStore = null
                     store = null
                 }
                 val completed = repository.sort(
-                    current.walletText.takeIf { current.useTextWallet }
+                    current.walletText.takeIf { current.useTextWallet }, useChecking = current.checkingFileUri != null
                 )
                 val next = completed.store
                 pending = next
+                pendingOld = completed.oldStore
                 val count = completed.count
                 val firstPage = next.readPage(0, SortingStore.PAGE_SIZE * 2)
                 storeMutex.withLock {
                     currentCoroutineContext().ensureActive()
                     if (disposed.get()) throw CancellationException()
                     store = next
+                    oldStore = completed.oldStore
+                    pendingOld = null
                     pending = null
                     _state.update {
                         it.copy(isLoading = false, hasCompletedSorting = true, showResults = true,
-                            results = firstPage, resultCount = count,
-                            message = if (count == 0) "لا توجد لوحات مطابقة" else "تم العثور على $count نتيجة")
+                            results = firstPage, resultCount = count, showingOld = false, newCount = count, oldCount = completed.oldCount,
+                            message = null)
                     }
                 }
             } catch (cancelled: CancellationException) {
@@ -174,8 +222,19 @@ class SortingViewModel @JvmOverloads constructor(
                 _state.update { it.copy(isLoading = false, message = failure.message ?: "حدث خطأ أثناء الفرز") }
             } finally {
                 pending?.close()
+                pendingOld?.close()
             }
         }
+    }
+
+    fun selectResults(old: Boolean) {
+        if (_state.value.isExporting || _state.value.showingOld == old) return
+        if (old && _state.value.oldCount == 0) return
+        pageJob?.cancel()
+        requestedStart = -1
+        _state.update { it.copy(showingOld = old, results = emptyList(), resultStart = -1,
+            resultCount = if (old) it.oldCount else it.newCount, message = null) }
+        loadVisibleRows(0)
     }
 
     fun loadVisibleRows(firstVisibleIndex: Int) {
@@ -187,7 +246,7 @@ class SortingViewModel @JvmOverloads constructor(
         pageJob = viewModelScope.launch(Dispatchers.IO) {
             try {
                 storeMutex.withLock {
-                    val source = store ?: return@withLock
+                    val source = (if (_state.value.showingOld) oldStore else store) ?: return@withLock
                     val rows = source.readPage(start, SortingStore.PAGE_SIZE * 2)
                     currentCoroutineContext().ensureActive()
                     withContext(Dispatchers.Main) {
@@ -232,10 +291,11 @@ class SortingViewModel @JvmOverloads constructor(
 
     private fun withResults(action: suspend (ResultStore) -> Unit) {
         if (_state.value.isLoading || _state.value.isExporting) return
+        val old = _state.value.showingOld
         _state.update { it.copy(isExporting = true, message = null) }
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                storeMutex.withLock { store?.let { action(it) } }
+                storeMutex.withLock { (if (old) oldStore else store)?.let { action(it) } }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {
@@ -254,6 +314,8 @@ class SortingViewModel @JvmOverloads constructor(
         CoroutineScope(Dispatchers.IO).launch {
             storeMutex.withLock {
                 store?.close()
+                    oldStore?.close()
+                    oldStore = null
                 store = null
             }
         }

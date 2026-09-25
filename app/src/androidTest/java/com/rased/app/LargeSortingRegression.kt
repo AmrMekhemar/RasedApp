@@ -47,6 +47,7 @@ class LargeSortingRegression(private val instrumentation: Instrumentation) {
         val context = instrumentation.targetContext
         val workbook = File.createTempFile("large-regression-", ".xlsx", context.cacheDir)
         val walletWorkbook = File.createTempFile("wallet-regression-", ".xlsx", context.cacheDir)
+        val checkingWorkbook = File.createTempFile("checking-regression-", ".xlsx", context.cacheDir)
         val export = File.createTempFile("large-export-", ".xlsx", context.cacheDir)
         val owner = ViewModelStore()
         val runtime = Runtime.getRuntime()
@@ -60,6 +61,9 @@ class LargeSortingRegression(private val instrumentation: Instrumentation) {
         try {
             makeWorkbook(workbook)
             makeWorkbook(walletWorkbook, walletFirst = true)
+            checkingWorkbook.outputStream().use { output ->
+                com.rased.core.excel.XlsxWriter.write(output, listOf("اللوحة")) { _ -> }
+            }
             check(workbook.length() > 15_000_000) { "Fixture must exceed 15 MB compressed: ${workbook.length()}" }
             lateinit var model: SortingViewModel
             instrumentation.runOnMainSync {
@@ -71,6 +75,7 @@ class LargeSortingRegression(private val instrumentation: Instrumentation) {
                 })[SortingViewModel::class.java]
                 model.setDataFile(Uri.fromFile(workbook))
                 model.setWalletFile(Uri.fromFile(walletWorkbook))
+                model.setCheckingFile(Uri.fromFile(checkingWorkbook))
             }
             runBlocking { withTimeout(60_000) { model.state.first { !it.isManagingFiles } } }
             instrumentation.runOnMainSync {
@@ -192,6 +197,7 @@ class LargeSortingRegression(private val instrumentation: Instrumentation) {
             sampler.shutdownNow()
             workbook.delete()
             walletWorkbook.delete()
+            checkingWorkbook.delete()
             export.delete()
         }
     }

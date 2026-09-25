@@ -44,7 +44,9 @@ fun SortingScreen(
     onUseTextWalletChange: (Boolean) -> Unit,
     onWalletTextChange: (String) -> Unit,
     onStartSorting: () -> Unit,
-    onShowResults: () -> Unit
+    onShowResults: () -> Unit,
+    onPickChecking: () -> Unit = {},
+    onRemoveChecking: () -> Unit = {}
 ) {
     SortingTheme {
         FeatureScaffold("قسم الفرز", onBack) { padding ->
@@ -72,7 +74,7 @@ fun SortingScreen(
                                     ) {
                                         FilePickerCard(
                                             title = "ملف الداتا",
-                                            description = "سيتم قراءة أول شيت في الملف",
+                                            description = "سيتم قراءة أول شيت ظاهر في الملف",
                                             fileName = state.dataFileName ?: state.dataFileUri?.lastPathSegment,
                                             buttonText = "اختيار ملف الداتا",
                                             onPick = onPickData,
@@ -81,6 +83,17 @@ fun SortingScreen(
                                         WalletInputCard(
                                             state.useTextWallet, state.walletText, state.walletFileName ?: state.walletFileUri?.lastPathSegment,
                                             onUseTextWalletChange, onWalletTextChange, onPickWallet,
+                                            modifier = Modifier.width(cardWidth).fillMaxHeight()
+                                        )
+                                        FilePickerCard(
+                                            title = "ملف التشييك (اختياري)",
+                                            description = "بدون هذا الملف تظهر كل النتائج كحديثة",
+                                            fileName = state.checkingFileName,
+                                            buttonText = "اختيار ملف التشييك",
+                                            onPick = onPickChecking,
+                                            stepNumber = "٣",
+                                            onRemove = onRemoveChecking,
+                                            removeEnabled = !state.isLoading && !state.isExporting && !state.isManagingFiles,
                                             modifier = Modifier.width(cardWidth).fillMaxHeight()
                                         )
                                     }
@@ -108,7 +121,7 @@ fun SortingScreen(
                     if (state.hasCompletedSorting) {
                         item {
                             OutlinedButton(onClick = onShowResults, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                                Text("عرض النتائج (${state.resultCount})")
+                                Text("عرض النتائج (${state.newCount + state.oldCount})")
                             }
                         }
                     }

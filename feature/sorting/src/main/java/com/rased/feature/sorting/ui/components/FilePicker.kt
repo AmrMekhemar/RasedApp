@@ -12,6 +12,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -20,15 +21,24 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 
 @Composable
-internal fun FilePickerCard(title: String, description: String, fileName: String?, buttonText: String, onPick: () -> Unit, modifier: Modifier = Modifier) {
+internal fun FilePickerCard(
+    title: String, description: String, fileName: String?, buttonText: String,
+    onPick: () -> Unit, modifier: Modifier = Modifier, stepNumber: String = "١",
+    onRemove: (() -> Unit)? = null, removeEnabled: Boolean = true
+) {
     Card(
         modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         border = BorderStroke(1.dp, SortingStyle.Border)
     ) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-            InputStepHeading("١", title, description)
+            InputStepHeading(stepNumber, title, description)
             FilePickerInline(fileName, buttonText, onPick)
+            if (fileName != null && onRemove != null) {
+                TextButton(onClick = onRemove, enabled = removeEnabled, modifier = Modifier.fillMaxWidth()) {
+                    Text("إزالة الملف", color = MaterialTheme.colorScheme.error)
+                }
+            }
         }
     }
 }
