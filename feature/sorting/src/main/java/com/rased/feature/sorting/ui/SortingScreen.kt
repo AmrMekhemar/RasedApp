@@ -54,7 +54,7 @@ fun SortingScreen(
 ) {
     SortingTheme {
         if (state.isManagingFiles && state.fileProgress != null) {
-            FileImportProgressScreen(state.fileProgress, onCancelFileOperation)
+            FileImportProgressScreen(state.fileProgress, state.fileProgressRows, state.fileProgressTotal, onCancelFileOperation)
         } else FeatureScaffold("قسم الفرز", onBack) { padding ->
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
                 LazyColumn(

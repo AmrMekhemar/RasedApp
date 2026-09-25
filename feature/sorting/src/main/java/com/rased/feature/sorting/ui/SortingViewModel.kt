@@ -228,16 +228,28 @@ class SortingViewModel @JvmOverloads constructor(
     }
     private fun finishFileOperation() {
         pendingFileOperations--
-        _state.update { it.copy(isManagingFiles = pendingFileOperations > 0, fileProgress = null) }
+        _state.update { it.copy(isManagingFiles = pendingFileOperations > 0, fileProgress = null,
+            fileProgressRows = 0, fileProgressTotal = 0) }
     }
 
-    private fun importProgress(isData: Boolean, rows: Int) {
-        showFileProgress(rows)
+    private fun importProgress(isData: Boolean, rows: Int, total: Int) {
+        showFileProgress(rows, total)
     }
 
-    private fun showFileProgress(rows: Int) {
+    private fun showFileProgress(rows: Int, total: Int = 0) {
         val text = "جاري إضافة وفهرسة $activeFileName${if (rows > 0) ": $rows صف" else "..."}"
-        _state.update { it.copy(isManagingFiles = true, message = null, fileProgress = text) }
+        val current = _state.value
+        val loadedRows = if (rows > 0) rows else current.fileProgressRows
+        val totalRows = if (total > 0) total else current.fileProgressTotal
+        val percentage = if (totalRows > 0) (loadedRows * 100 / totalRows).coerceIn(0, 100) else 0
+        val notificationText = if (totalRows > 0) {
+            "$activeFileName: $loadedRows / $totalRows rows ($percentage%)"
+        } else {
+            "$activeFileName: $loadedRows rows"
+        }
+        _state.update { it.copy(isManagingFiles = true, message = null, fileProgress = text,
+            fileProgressRows = if (rows > 0) rows else it.fileProgressRows,
+            fileProgressTotal = if (total > 0) total else it.fileProgressTotal) }
         runCatching {
             if (android.os.Build.VERSION.SDK_INT >= 26) {
                 notificationManager.createNotificationChannel(
@@ -249,9 +261,9 @@ class SortingViewModel @JvmOverloads constructor(
             } else Notification.Builder(getApplication())
             notification.setSmallIcon(android.R.drawable.stat_sys_upload)
                 .setContentTitle("إضافة ملف")
-                .setContentText(text)
+                .setContentText(notificationText)
                 .setOngoing(true)
-                .setProgress(0, 0, true)
+                .setProgress(totalRows, loadedRows.coerceAtMost(totalRows), totalRows <= 0)
                 .build()
                 .also { notificationManager.notify(progressNotificationId, it) }
         }.onFailure { Log.d("SortingViewModel", "Progress notification unavailable", it) }

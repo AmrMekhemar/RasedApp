@@ -33,7 +33,7 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
 
     suspend fun loadInputs(
         onFailure: (Boolean, Exception) -> Unit = { _, _ -> },
-        onProgress: (Boolean, Int) -> Unit = { _, _ -> }
+        onProgress: (Boolean, Int, Int) -> Unit = { _, _, _ -> }
     ): Pair<SavedFile?, SavedFile?> =
         withContext(Dispatchers.IO) {
             operationMutex.withLock {
@@ -59,7 +59,7 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
             }
         }
 
-    suspend fun replaceInput(uri: Uri, isData: Boolean, onProgress: (Boolean, Int) -> Unit = { _, _ -> }): SavedFile =
+    suspend fun replaceInput(uri: Uri, isData: Boolean, onProgress: (Boolean, Int, Int) -> Unit = { _, _, _ -> }): SavedFile =
         withContext(Dispatchers.IO) {
             operationMutex.withLock {
                 val job = currentCoroutineContext()
@@ -74,13 +74,13 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
             val saved = files.listByPrefix("$slotPrefix.data.extra.")
             val job = currentCoroutineContext()
             database.runInTransaction {
-                saved.forEach { ensureImported(it, true, { job.ensureActive() }, { _, _ -> }) }
+                saved.forEach { ensureImported(it, true, { job.ensureActive() }, { _, _, _ -> }) }
             }
             saved
         }
     }
 
-    suspend fun addData(uri: Uri, onProgress: (Boolean, Int) -> Unit = { _, _ -> }): SavedFile = withContext(Dispatchers.IO) {
+    suspend fun addData(uri: Uri, onProgress: (Boolean, Int, Int) -> Unit = { _, _, _ -> }): SavedFile = withContext(Dispatchers.IO) {
         operationMutex.withLock {
             val prefix = "$slotPrefix.data.extra."
             val last = files.listByPrefix(prefix).lastOrNull()?.slot?.removePrefix(prefix)?.toLong() ?: 0L
@@ -91,7 +91,7 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
         }
     }
 
-    suspend fun replaceDataFile(index: Int, uri: Uri, onProgress: (Boolean, Int) -> Unit = { _, _ -> }): SavedFile {
+    suspend fun replaceDataFile(index: Int, uri: Uri, onProgress: (Boolean, Int, Int) -> Unit = { _, _, _ -> }): SavedFile {
         if (index == 0) return replaceInput(uri, true, onProgress)
         return withContext(Dispatchers.IO) {
             operationMutex.withLock {
@@ -105,7 +105,7 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
         }
     }
 
-    suspend fun replaceOrAddSecondData(uri: Uri, onProgress: (Boolean, Int) -> Unit = { _, _ -> }): SavedFile {
+    suspend fun replaceOrAddSecondData(uri: Uri, onProgress: (Boolean, Int, Int) -> Unit = { _, _, _ -> }): SavedFile {
         return if (files.listByPrefix("$slotPrefix.data.extra.").isEmpty()) addData(uri, onProgress)
         else replaceDataFile(1, uri, onProgress)
     }
@@ -137,7 +137,7 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
         operationMutex.withLock {
             val saved = files.get("$slotPrefix.checking") ?: return@withLock null
             val job = currentCoroutineContext()
-            database.runInTransaction { ensureImported(saved, false, { job.ensureActive() }, { _, _ -> }, sheetIndex = 1) }
+            database.runInTransaction { ensureImported(saved, false, { job.ensureActive() }, { _, _, _ -> }, sheetIndex = 1) }
             saved
         }
     }
@@ -146,12 +146,12 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
         operationMutex.withLock {
             val job = currentCoroutineContext()
             files.replace("$slotPrefix.checking", uri) { saved, _ ->
-                ensureImported(saved, false, { job.ensureActive() }, { _, _ -> }, sheetIndex = 1)
+                ensureImported(saved, false, { job.ensureActive() }, { _, _, _ -> }, sheetIndex = 1)
             }
         }
     }
 
-    private fun ensureImported(saved: SavedFile, isData: Boolean, checkActive: () -> Unit, progress: (Boolean, Int) -> Unit, sheetIndex: Int = 0) {
+    private fun ensureImported(saved: SavedFile, isData: Boolean, checkActive: () -> Unit, progress: (Boolean, Int, Int) -> Unit, sheetIndex: Int = 0) {
         val revision = "${saved.fileName}:$PARSER_VERSION"
         val previous = dao.imported(saved.slot)
         if (previous?.revision == revision && previous.parserVersion == PARSER_VERSION) return
@@ -163,7 +163,7 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
         var keys: List<String?>? = null
         var sequence = 0L
         val aliases = if (isData) DATA_COLUMNS else listOf(SortingEngine.plateNames(), SortingEngine.walletTypeNames(), SortingEngine.locationNames())
-        progress(isData, 0)
+        progress(isData, 0, 0)
         reader.forEachSelectedRow(files.uri(saved), null, SortingEngine.plateNames(), aliases.flatten().toSet(), checkActive, { row ->
             checkActive()
             if (keys == null) keys = aliases.map { names ->
@@ -180,8 +180,8 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
             sequence++
             if (dataBatch.size >= 64) { dao.insertData(dataBatch); dataBatch.clear() }
             if (walletBatch.size >= 64) { dao.insertWallet(walletBatch); walletBatch.clear() }
-            if (sequence % 1000L == 0L) progress(isData, sequence.toInt())
-        }, visibleSheetIndex = sheetIndex)
+            if (sequence % 1000L == 0L) progress(isData, sequence.toInt(), 0)
+        }, visibleSheetIndex = sheetIndex, onTotalRows = { total -> progress(isData, 0, total) })
         if (dataBatch.isNotEmpty()) dao.insertData(dataBatch)
         if (walletBatch.isNotEmpty()) dao.insertWallet(walletBatch)
         checkActive()
@@ -189,7 +189,7 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
         previous?.takeIf { it.revision != revision }?.let {
             if (isData) dao.deleteData(it.revision) else dao.deleteWallet(it.revision)
         }
-        progress(isData, sequence.toInt())
+        progress(isData, sequence.toInt(), sequence.toInt())
     }
 
     suspend fun sort(walletText: String? = null, useChecking: Boolean = false): CompletedSorting {
@@ -217,7 +217,7 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
                     job.ensureActive()
                     check(dataFiles.isNotEmpty()) { "اختر ملف الداتا أولًا" }
                     val revisions = dataFiles.map { saved ->
-                        ensureImported(saved, true, { job.ensureActive() }, { _, _ -> })
+                        ensureImported(saved, true, { job.ensureActive() }, { _, _, _ -> })
                         requireNotNull(dao.imported(saved.slot)).revision
                     }
                     val dataRevision = if (revisions.size == 1) revisions.single() else {

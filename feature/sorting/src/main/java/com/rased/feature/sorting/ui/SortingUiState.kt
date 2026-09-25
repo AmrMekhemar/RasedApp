@@ -16,6 +16,8 @@ data class SortingUiState(
     val walletFileName: String? = null,
     val isManagingFiles: Boolean = true,
     val fileProgress: String? = null,
+    val fileProgressRows: Int = 0,
+    val fileProgressTotal: Int = 0,
     val useTextWallet: Boolean = false,
     val walletText: String = "",
     val isLoading: Boolean = false,

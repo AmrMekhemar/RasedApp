@@ -41,7 +41,8 @@ class XlsxReader(private val context: Context) {
         selectedHeaders: Set<String>?,
         checkActive: () -> Unit,
         onRow: (Map<String, String>) -> Unit,
-        visibleSheetIndex: Int = 0
+        visibleSheetIndex: Int = 0,
+        onTotalRows: (Int) -> Unit = {}
     ) {
         // Private file URIs are seekable already. Only spool external content providers.
         val temporary = uri.scheme != "file"
@@ -70,6 +71,7 @@ class XlsxReader(private val context: Context) {
                     }
                     sharedStrings.finishWriting()
                     val entry = zip.getEntry(target) ?: error("تعذر قراءة الشيت المطلوب")
+                    onTotalRows(sheetRowCount(zip, entry))
                     val aliases = headerAliases.map(::normalizeHeader).toSet()
                     val selected = selectedHeaders?.map(::normalizeHeader)?.toSet()
                     var headers: Map<Int, String>? = null
@@ -184,6 +186,19 @@ class XlsxReader(private val context: Context) {
             }
         }
         return map
+    }
+
+    private fun sheetRowCount(zip: ZipFile, entry: java.util.zip.ZipEntry): Int {
+        zip.getInputStream(entry).use { input ->
+            val parser = newParser(input)
+            while (parser.next() != XmlPullParser.END_DOCUMENT) {
+                if (parser.eventType == XmlPullParser.START_TAG && parser.name.substringAfter(':') == "dimension") {
+                    val ref = parser.getAttributeValue(null, "ref").orEmpty().substringAfterLast(':')
+                    return Regex("[0-9]+$").find(ref)?.value?.toIntOrNull() ?: 0
+                }
+            }
+        }
+        return 0
     }
 
     private fun normalizeWorkbookTarget(target: String): String {
