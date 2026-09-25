@@ -138,14 +138,14 @@ private fun ResultCardHeader(result: SortingResult) {
                 }
                 Text(buildAnnotatedString {
                     if (!result.type.isNullOrBlank()) {
-                        withStyle(SpanStyle(color = CardMuted)) { append("النوع: ") }
+                        withStyle(SpanStyle(color = CardMuted)) { append("طراز: ") }
                         append(result.type)
                     }
                     if (!result.type.isNullOrBlank() && !result.walletType.isNullOrBlank()) {
                         withStyle(SpanStyle(color = CardMuted)) { append("  |  ") }
                     }
                     if (!result.walletType.isNullOrBlank()) {
-                        withStyle(SpanStyle(color = CardMuted)) { append("طراز السيارة: ") }
+                        withStyle(SpanStyle(color = CardMuted)) { append("موديل السيارة: ") }
                         append(result.walletType)
                     }
                 }, color = CardInk, style = MaterialTheme.typography.bodySmall)
