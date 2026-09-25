@@ -23,6 +23,7 @@ class RoomSortingRegression(private val context: Context) {
             verifyCheckingSplit()
             verifyPlateOnlyInputs()
             verifyPlateDiscovery()
+            verifyMultipleDataFiles()
         }
         val repository = SortingRepository(context, "room.regression")
         val files = SavedFileStorage(context)
@@ -120,6 +121,63 @@ class RoomSortingRegression(private val context: Context) {
             check(restored.count == 1)
             check(it.readPage(0, 100).single().note == "updated")
             check(it.readPage(0, 100).single().walletType == "replacement")
+        }
+    }
+
+    private suspend fun verifyMultipleDataFiles() {
+        val prefix = "room.multi.${java.util.UUID.randomUUID()}"
+        val repository = SortingRepository(context, prefix)
+        val source = File.createTempFile("multi-data-", ".xlsx", context.cacheDir)
+        val export = File.createTempFile("multi-export-", ".xlsx", context.cacheDir)
+        val files = SavedFileStorage(context)
+        try {
+            write(source, listOf("اللوحة", "الملاحظة"), listOf(listOf("ابج1234", "first")))
+            val primary = repository.addData(Uri.fromFile(source))
+            write(source, listOf("اللوحة", "الملاحظة"), listOf(listOf("ابج1234", "duplicate"), listOf("دهو5678", "second")))
+            val second = repository.addData(Uri.fromFile(source))
+            write(source, listOf("اللوحة", "الملاحظة"), listOf(listOf("زحط9999", "third")))
+            val third = repository.addData(Uri.fromFile(source))
+            check(repository.loadAdditionalData() == listOf(second, third))
+            source.writeText("invalid workbook")
+            check(runCatching { repository.addData(Uri.fromFile(source)) }.isFailure)
+            check(repository.loadAdditionalData() == listOf(second, third))
+            check(files.get("$prefix.data") == primary)
+            write(source, listOf("اللوحة"), listOf(listOf("زحط9999"), listOf("دهو5678"), listOf("ابج1234")))
+            repository.replaceInput(Uri.fromFile(source), false)
+            write(source, listOf("اللوحة"), listOf(listOf("دهو5678")))
+            repository.replaceChecking(Uri.fromFile(source))
+            val restored = SortingRepository(context, prefix)
+            restored.loadInputs()
+            check(restored.loadAdditionalData() == listOf(second, third))
+            val all = restored.sort()
+            all.store.use { snapshot ->
+                check(all.count == 3)
+                check(snapshot.readPage(0, 10).map { it.note } == listOf("third", "second", "first"))
+                check(snapshot.readPage(1, 1).single().note == "second")
+                export.outputStream().use(snapshot::writeXlsx)
+                check(XlsxReader(context).readSheet(Uri.fromFile(export), null, SortingEngine.plateNames()).size == 3)
+                write(source, listOf("اللوحة", "الملاحظة"), listOf(listOf("ابج1234", "updated")))
+                restored.replaceInput(Uri.fromFile(source), true)
+                check(snapshot.readPage(2, 1).single().note == "first")
+            }
+            val split = restored.sort(useChecking = true)
+            split.store.use {
+                check(split.count == 2)
+                check(it.readPage(0, 10).map { row -> row.note } == listOf("third", "updated"))
+            }
+            requireNotNull(split.oldStore).use {
+                check(split.oldCount == 1 && it.readPage(0, 10).single().note == "second")
+            }
+        } finally {
+            source.delete()
+            export.delete()
+            val dao = RasedDatabase.getInstance(context).sorting()
+            for (saved in files.listByPrefix("$prefix.")) {
+                files.remove(saved.slot) {
+                    dao.imported(saved.slot)?.let { dao.deleteData(it.revision); dao.deleteWallet(it.revision) }
+                    dao.deleteImport(saved.slot)
+                }
+            }
         }
     }
 

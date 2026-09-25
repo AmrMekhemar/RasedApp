@@ -12,6 +12,7 @@ data class SortingUiState(
     val dataFileUri: Uri? = null,
     val walletFileUri: Uri? = null,
     val dataFileName: String? = null,
+    val additionalDataFileNames: List<String> = emptyList(),
     val walletFileName: String? = null,
     val isManagingFiles: Boolean = true,
     val fileProgress: String? = null,

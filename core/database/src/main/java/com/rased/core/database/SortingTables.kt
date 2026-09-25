@@ -39,6 +39,9 @@ interface SortingDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE) fun insertData(rows: List<IndexedDataRow>)
     @Insert(onConflict = OnConflictStrategy.IGNORE) fun insertWallet(rows: List<IndexedWalletRow>)
     @Query("DELETE FROM sorting_data WHERE revision = :revision") fun deleteData(revision: String)
+    @Query("""INSERT OR IGNORE INTO sorting_data(revision,normalized,plate,type,note,street,district,date,location)
+        SELECT :target,normalized,plate,type,note,street,district,date,location FROM sorting_data WHERE revision = :source""")
+    fun mergeData(source: String, target: String)
     @Query("DELETE FROM sorting_wallet WHERE revision = :revision") fun deleteWallet(revision: String)
 
     @Query("""INSERT INTO sorting_results(runId,plate,type,note,street,district,date,walletType,location)

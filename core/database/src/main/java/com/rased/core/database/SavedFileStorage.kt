@@ -18,6 +18,7 @@ class SavedFileStorage(context: Context) {
     private val dao get() = RasedDatabase.getInstance(context).savedFiles()
 
     suspend fun get(slot: String): SavedFile? = withContext(Dispatchers.IO) { dao.get(slot) }
+    suspend fun listByPrefix(prefix: String): List<SavedFile> = withContext(Dispatchers.IO) { dao.listByPrefix(prefix) }
 
     fun uri(file: SavedFile): Uri = Uri.fromFile(File(directory, file.fileName))
 

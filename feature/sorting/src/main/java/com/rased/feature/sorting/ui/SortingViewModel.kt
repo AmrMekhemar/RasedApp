@@ -71,6 +71,8 @@ class SortingViewModel @JvmOverloads constructor(
                     } catch (failure: Exception) {
                         _state.update { it.copy(message = "تعذر استعادة ملف التشييك؛ اختر الملف مجددًا") }
                     }
+                    val additionalData = repository.loadAdditionalData()
+                    _state.update { it.copy(additionalDataFileNames = additionalData.map { file -> file.displayName }) }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (failure: Exception) {
@@ -84,6 +86,32 @@ class SortingViewModel @JvmOverloads constructor(
     }
 
     fun setDataFile(uri: Uri?) = saveInputFile(uri, isData = true)
+    fun addDataFile(uri: Uri?) = saveInputFile(uri, isData = true, appendData = true)
+    fun replaceDataFile(index: Int, uri: Uri?) {
+        if (uri == null) return
+        saveInputFile(uri, isData = true, dataIndex = index)
+    }
+    fun removeDataFile(index: Int) {
+        if (_state.value.isLoading || _state.value.isExporting || _state.value.isManagingFiles) return
+        pendingFileOperations++
+        _state.update { it.copy(isManagingFiles = true, message = null) }
+        viewModelScope.launch {
+            fileMutex.withLock {
+                try {
+                    repository.removeDataFile(index)
+                    val files = repository.loadAdditionalData()
+                    val primary = savedFiles.get("sorting.data")
+                    _state.update { it.copy(
+                        dataFileUri = primary?.let(savedFiles::uri), dataFileName = primary?.displayName,
+                        additionalDataFileNames = files.map { file -> file.displayName }
+                    ) }
+                } catch (cancelled: CancellationException) { throw cancelled
+                } catch (failure: Exception) {
+                    _state.update { it.copy(message = "تعذر حذف ملف الداتا. ${failure.message.orEmpty()}") }
+                } finally { finishFileOperation() }
+            }
+        }
+    }
     fun setWalletFile(uri: Uri?) = saveInputFile(uri, isData = false)
 
     fun setCheckingFile(uri: Uri?) = saveInputFile(uri, isData = false, isChecking = true)
@@ -119,7 +147,7 @@ class SortingViewModel @JvmOverloads constructor(
         }
     }
 
-    private fun saveInputFile(uri: Uri?, isData: Boolean, isChecking: Boolean = false) {
+    private fun saveInputFile(uri: Uri?, isData: Boolean, isChecking: Boolean = false, appendData: Boolean = false, dataIndex: Int? = null) {
         if (uri == null) return
         if (_state.value.isLoading || _state.value.isExporting) {
             _state.update { it.copy(message = "انتظر انتهاء العملية ثم اختر الملف الجديد") }
@@ -131,9 +159,12 @@ class SortingViewModel @JvmOverloads constructor(
             fileMutex.withLock {
                 _state.update { it.copy(isManagingFiles = true) }
                 try {
-                    val saved = if (isChecking) repository.replaceChecking(uri) else repository.replaceInput(uri, isData, ::importProgress)
+                    val saved = if (dataIndex != null) repository.replaceDataFile(dataIndex, uri, ::importProgress)
+                        else if (appendData) repository.addData(uri, ::importProgress)
+                        else if (isChecking) repository.replaceChecking(uri) else repository.replaceInput(uri, isData, ::importProgress)
                     _state.update {
-                        if (isChecking) it.copy(checkingFileUri = savedFiles.uri(saved), checkingFileName = saved.displayName)
+                        if (appendData && saved.slot.contains(".data.extra.")) it.copy(additionalDataFileNames = it.additionalDataFileNames + saved.displayName)
+                        else if (isChecking) it.copy(checkingFileUri = savedFiles.uri(saved), checkingFileName = saved.displayName)
                         else if (isData) it.copy(dataFileUri = savedFiles.uri(saved), dataFileName = saved.displayName)
                         else it.copy(walletFileUri = savedFiles.uri(saved), walletFileName = saved.displayName)
                     }
@@ -168,7 +199,7 @@ class SortingViewModel @JvmOverloads constructor(
         val current = _state.value
         if (current.isLoading || current.isExporting || current.isManagingFiles) return
         val dataUri = current.dataFileUri
-        if (dataUri == null) {
+        if (dataUri == null && current.additionalDataFileNames.isEmpty()) {
             _state.update { it.copy(message = "اختر ملف الداتا أولًا") }
             return
         }

@@ -46,7 +46,10 @@ fun SortingScreen(
     onStartSorting: () -> Unit,
     onShowResults: () -> Unit,
     onPickChecking: () -> Unit = {},
-    onRemoveChecking: () -> Unit = {}
+    onRemoveChecking: () -> Unit = {},
+    onAddData: () -> Unit = {},
+    onPickAdditionalData: (Int) -> Unit = {},
+    onRemoveData: (Int) -> Unit = {}
 ) {
     SortingTheme {
         FeatureScaffold("قسم الفرز", onBack) { padding ->
@@ -78,6 +81,13 @@ fun SortingScreen(
                                             fileName = state.dataFileName ?: state.dataFileUri?.lastPathSegment,
                                             buttonText = "اختيار ملف الداتا",
                                             onPick = onPickData,
+                                            additionalFileNames = state.additionalDataFileNames,
+                                            onAdd = if (state.additionalDataFileNames.size < 1) onAddData else null,
+                                            addEnabled = !state.isLoading && !state.isExporting && !state.isManagingFiles,
+                                            onPickAdditional = onPickAdditionalData,
+                                            onRemoveAdditional = { index -> onRemoveData(index + 1) },
+                                            onRemove = { onRemoveData(0) },
+                                            removeEnabled = !state.isLoading && !state.isExporting && !state.isManagingFiles,
                                             modifier = Modifier.width(cardWidth).fillMaxHeight()
                                         )
                                         WalletInputCard(

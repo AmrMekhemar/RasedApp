@@ -8,6 +8,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 
@@ -26,6 +29,14 @@ fun SortingRoute(onBack: () -> Unit, viewModel: SortingViewModel = viewModel()) 
 
     val dataPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(viewModel::setDataFile)
+    }
+    val additionalDataPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let(viewModel::addDataFile)
+    }
+    var dataEditIndex by remember { mutableIntStateOf(-1) }
+    val dataEditPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (dataEditIndex >= 0) viewModel.replaceDataFile(dataEditIndex, uri)
+        dataEditIndex = -1
     }
     val walletPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(viewModel::setWalletFile)
@@ -71,7 +82,13 @@ fun SortingRoute(onBack: () -> Unit, viewModel: SortingViewModel = viewModel()) 
             onStartSorting = viewModel::startSorting,
             onShowResults = viewModel::openResults,
             onPickChecking = { checkingPicker.launch(excelMimeTypes) },
-            onRemoveChecking = viewModel::removeCheckingFile
+            onRemoveChecking = viewModel::removeCheckingFile,
+            onAddData = { additionalDataPicker.launch(excelMimeTypes) }
+            , onPickAdditionalData = { index ->
+                dataEditIndex = index + 1
+                dataEditPicker.launch(excelMimeTypes)
+            },
+            onRemoveData = viewModel::removeDataFile
         )
     }
 }

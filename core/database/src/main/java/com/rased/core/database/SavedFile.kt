@@ -17,6 +17,8 @@ data class SavedFile(
 
 @Dao
 interface SavedFileDao {
+    @Query("SELECT * FROM saved_files WHERE substr(slot, 1, length(:prefix)) = :prefix ORDER BY slot")
+    fun listByPrefix(prefix: String): List<SavedFile>
     @Query("SELECT * FROM saved_files WHERE slot = :slot")
     fun get(slot: String): SavedFile?
 

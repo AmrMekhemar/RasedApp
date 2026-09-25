@@ -67,6 +67,55 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
             }
         }
 
+    suspend fun loadAdditionalData(): List<SavedFile> = withContext(Dispatchers.IO) {
+        operationMutex.withLock {
+            val saved = files.listByPrefix("$slotPrefix.data.extra.")
+            val job = currentCoroutineContext()
+            database.runInTransaction {
+                saved.forEach { ensureImported(it, true, { job.ensureActive() }) { _, _ -> } }
+            }
+            saved
+        }
+    }
+
+    suspend fun addData(uri: Uri, onProgress: (Boolean, Int) -> Unit = { _, _ -> }): SavedFile = withContext(Dispatchers.IO) {
+        operationMutex.withLock {
+            val prefix = "$slotPrefix.data.extra."
+            val last = files.listByPrefix(prefix).lastOrNull()?.slot?.removePrefix(prefix)?.toLong() ?: 0L
+            val slot = if (files.get("$slotPrefix.data") == null) "$slotPrefix.data"
+                else prefix + (last + 1).toString().padStart(10, '0')
+            val job = currentCoroutineContext()
+            files.replace(slot, uri) { saved, _ -> ensureImported(saved, true, { job.ensureActive() }, onProgress) }
+        }
+    }
+
+    suspend fun replaceDataFile(index: Int, uri: Uri, onProgress: (Boolean, Int) -> Unit = { _, _ -> }): SavedFile {
+        if (index == 0) return replaceInput(uri, true, onProgress)
+        return withContext(Dispatchers.IO) {
+            operationMutex.withLock {
+                val saved = files.listByPrefix("$slotPrefix.data.extra.").getOrNull(index - 1)
+                    ?: error("ملف الداتا غير موجود")
+                val job = currentCoroutineContext()
+                files.replace(saved.slot, uri) { replacement, _ ->
+                    ensureImported(replacement, true, { job.ensureActive() }, onProgress)
+                }
+            }
+        }
+    }
+
+    suspend fun removeDataFile(index: Int) = withContext(Dispatchers.IO) {
+        operationMutex.withLock {
+            val saved = if (index == 0) files.get("$slotPrefix.data")
+            else files.listByPrefix("$slotPrefix.data.extra.").getOrNull(index - 1)
+            saved?.let {
+                files.remove(it.slot) {
+                    dao.imported(it.slot)?.let { imported -> dao.deleteData(imported.revision) }
+                    dao.deleteImport(it.slot)
+                }
+            }
+        }
+    }
+
     suspend fun removeChecking() = withContext(Dispatchers.IO) {
         operationMutex.withLock {
             val slot = "$slotPrefix.checking"
@@ -156,9 +205,19 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
             var result: RoomResultStore? = null
             try {
                 var count = 0
+                val dataFiles = listOfNotNull(files.get("$slotPrefix.data")) + files.listByPrefix("$slotPrefix.data.extra.")
                 database.runInTransaction {
                     job.ensureActive()
-                    val data = requireNotNull(dao.imported("$slotPrefix.data")) { "اختر ملف الداتا أولًا" }
+                    check(dataFiles.isNotEmpty()) { "اختر ملف الداتا أولًا" }
+                    val revisions = dataFiles.map { saved ->
+                        ensureImported(saved, true, { job.ensureActive() }) { _, _ -> }
+                        requireNotNull(dao.imported(saved.slot)).revision
+                    }
+                    val dataRevision = if (revisions.size == 1) revisions.single() else {
+                        // First added file wins for repeated plates, matching the existing first-row rule.
+                        revisions.forEach { job.ensureActive(); dao.mergeData(it, runId) }
+                        runId
+                    }
                     val walletRevision = if (walletText != null) {
                         val batch = ArrayList<IndexedWalletRow>(64)
                         walletText.lineSequence().forEachIndexed { index, plate ->
@@ -171,9 +230,10 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
                     } else requireNotNull(dao.imported("$slotPrefix.wallet")) { "اختر ملف المحفظة أولًا" }.revision
                     if (useChecking) {
                         val checking = requireNotNull(dao.imported("$slotPrefix.checking")) { "اختر ملف التشييك أولًا" }
-                        dao.matchChecked(runId, data.revision, walletRevision, checking.revision, false)
-                        dao.matchChecked(oldRunId, data.revision, walletRevision, checking.revision, true)
-                    } else dao.match(runId, data.revision, walletRevision)
+                        dao.matchChecked(runId, dataRevision, walletRevision, checking.revision, false)
+                        dao.matchChecked(oldRunId, dataRevision, walletRevision, checking.revision, true)
+                    } else dao.match(runId, dataRevision, walletRevision)
+                    if (revisions.size > 1) dao.deleteData(runId)
                     if (walletText != null) dao.deleteWallet(runId)
                     count = dao.count(runId)
                     job.ensureActive()
