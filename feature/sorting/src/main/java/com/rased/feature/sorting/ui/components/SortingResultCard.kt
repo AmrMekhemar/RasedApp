@@ -73,9 +73,7 @@ internal fun SortingResultCard(result: SortingResult) {
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 if (!result.district.isNullOrBlank())
                                     AddressField("الحي", result.district, R.drawable.ic_result_pin, Modifier.weight(1f))
-                                if (!result.district.isNullOrBlank() && !result.street.isNullOrBlank()) SectionDivider()
-                                if (!result.street.isNullOrBlank())
-                                    AddressField("الشارع", result.street, R.drawable.ic_result_road, Modifier.weight(1f))
+//                                if (!result.district.isNullOrBlank() && !result.street.isNullOrBlank()) SectionDivider()
                             }
                         }
                         if (hasFooter) ResultCardFooter(result)
@@ -138,7 +136,8 @@ private fun ResultCardHeader(result: SortingResult) {
                     val fields = listOf(
                         "النوع" to result.type,
                         "الطراز" to result.walletModel,
-                        "اللون" to result.walletType
+                        "اللون" to result.walletType,
+                        "الشارع" to result.street
                     ).filter { !it.second.isNullOrBlank() }
                     fields.forEachIndexed { index, (label, value) ->
                         if (index > 0) withStyle(SpanStyle(color = CardMuted)) { append("  |  ") }
