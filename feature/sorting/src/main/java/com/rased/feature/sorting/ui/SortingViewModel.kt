@@ -312,7 +312,6 @@ class SortingViewModel @JvmOverloads constructor(
             fileProgressRows = if (rows > 0) rows else it.fileProgressRows,
             fileProgressTotal = if (total > 0) total else it.fileProgressTotal) }
         val shouldNotify = rows == 0 || total > 0 || rows - lastNotificationRows >= 5000 ||
-                updateIndexingProgress(slot, isData, rows, total, false)
             (totalRows > 0 && loadedRows >= totalRows)
         if (!shouldNotify) return
         lastNotificationRows = loadedRows
