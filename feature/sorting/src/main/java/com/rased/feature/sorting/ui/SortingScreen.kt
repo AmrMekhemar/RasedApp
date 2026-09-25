@@ -49,10 +49,13 @@ fun SortingScreen(
     onRemoveChecking: () -> Unit = {},
     onAddData: () -> Unit = {},
     onPickAdditionalData: (Int) -> Unit = {},
-    onRemoveData: (Int) -> Unit = {}
+    onRemoveData: (Int) -> Unit = {},
+    onCancelFileOperation: () -> Unit = {}
 ) {
     SortingTheme {
-        FeatureScaffold("قسم الفرز", onBack) { padding ->
+        if (state.isManagingFiles && state.fileProgress != null) {
+            FileImportProgressScreen(state.fileProgress, onCancelFileOperation)
+        } else FeatureScaffold("قسم الفرز", onBack) { padding ->
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
                 LazyColumn(
                     modifier = Modifier

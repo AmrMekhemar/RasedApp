@@ -88,7 +88,8 @@ fun SortingRoute(onBack: () -> Unit, viewModel: SortingViewModel = viewModel()) 
                 dataEditIndex = index + 1
                 dataEditPicker.launch(excelMimeTypes)
             },
-            onRemoveData = viewModel::removeDataFile
+            onRemoveData = viewModel::removeDataFile,
+            onCancelFileOperation = viewModel::cancelFileOperation
         )
     }
 }

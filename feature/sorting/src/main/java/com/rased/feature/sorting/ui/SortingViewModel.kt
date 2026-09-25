@@ -48,6 +48,7 @@ class SortingViewModel @JvmOverloads constructor(
     private val savedFiles = SavedFileStorage(application)
     private val fileMutex = Mutex()
     private var pendingFileOperations = 1
+    private var fileOperationJob: Job? = null
     private var activeFileName: String = "الملف"
     private val progressNotificationId = 7412
     private val notificationManager by lazy {
@@ -55,7 +56,7 @@ class SortingViewModel @JvmOverloads constructor(
     }
 
     init {
-        viewModelScope.launch {
+        fileOperationJob = viewModelScope.launch {
             fileMutex.withLock {
                 try {
                     val restoreErrors = mutableListOf<String>()
@@ -89,10 +90,12 @@ class SortingViewModel @JvmOverloads constructor(
                 } finally {
                     finishFileNotification()
                     finishFileOperation()
+                    fileOperationJob = null
                 }
             }
         }
     }
+    fun cancelFileOperation() { fileOperationJob?.cancel() }
 
     fun setDataFile(uri: Uri?) = saveInputFile(uri, isData = true)
     fun addDataFile(uri: Uri?) = saveInputFile(uri, isData = true, appendData = true)
@@ -115,7 +118,7 @@ class SortingViewModel @JvmOverloads constructor(
         pendingFileOperations++
         activeFileName = uri.lastPathSegment ?: "الملف"
         showFileProgress(0)
-        viewModelScope.launch {
+        fileOperationJob = viewModelScope.launch {
             fileMutex.withLock {
                 try {
                     val saved = repository.replaceOrAddSecondData(uri, ::importProgress)
@@ -127,6 +130,7 @@ class SortingViewModel @JvmOverloads constructor(
                 } finally {
                     finishFileNotification()
                     finishFileOperation()
+                    fileOperationJob = null
                 }
             }
         }
@@ -135,7 +139,7 @@ class SortingViewModel @JvmOverloads constructor(
         if (_state.value.isLoading || _state.value.isExporting || _state.value.isManagingFiles) return
         pendingFileOperations++
         _state.update { it.copy(isManagingFiles = true, message = null) }
-        viewModelScope.launch {
+        fileOperationJob = viewModelScope.launch {
             fileMutex.withLock {
                 try {
                     repository.removeDataFile(index)
@@ -148,7 +152,7 @@ class SortingViewModel @JvmOverloads constructor(
                 } catch (cancelled: CancellationException) { throw cancelled
                 } catch (failure: Exception) {
                     _state.update { it.copy(message = "تعذر حذف ملف الداتا. ${failure.message.orEmpty()}") }
-                } finally { finishFileOperation() }
+                } finally { finishFileOperation(); fileOperationJob = null }
             }
         }
     }
@@ -160,7 +164,7 @@ class SortingViewModel @JvmOverloads constructor(
         if (_state.value.isLoading || _state.value.isExporting || _state.value.isManagingFiles) return
         pendingFileOperations++
         _state.update { it.copy(isManagingFiles = true, message = null) }
-        viewModelScope.launch {
+        fileOperationJob = viewModelScope.launch {
             fileMutex.withLock {
                 try {
                     repository.removeChecking()
@@ -196,7 +200,7 @@ class SortingViewModel @JvmOverloads constructor(
         pendingFileOperations++
         activeFileName = uri.lastPathSegment ?: "الملف"
         showFileProgress(0)
-        viewModelScope.launch {
+        fileOperationJob = viewModelScope.launch {
             fileMutex.withLock {
                 _state.update { it.copy(isManagingFiles = true) }
                 try {
@@ -217,6 +221,7 @@ class SortingViewModel @JvmOverloads constructor(
                 } finally {
                     finishFileNotification()
                     finishFileOperation()
+                    fileOperationJob = null
                 }
             }
         }
