@@ -256,7 +256,7 @@ class SortingViewModel @JvmOverloads constructor(
     }
     private fun scheduleBackgroundIndex(slot: String, isData: Boolean, sheetIndex: Int = 0) {
         backgroundIndexJobs[slot]?.cancel()
-        updateIndexingProgress(slot, isData, 0, 0, true)
+        updateIndexingProgress(slot, isData, 0, 0, true, sheetIndex == 1)
         backgroundIndexJobs[slot] = viewModelScope.launch(Dispatchers.IO) {
             var rows = 0
             var total = 0
@@ -264,22 +264,23 @@ class SortingViewModel @JvmOverloads constructor(
                 repository.indexSavedInput(slot, isData, sheetIndex) { loaded, count ->
                     rows = loaded
                     total = count
-                    updateIndexingProgress(slot, isData, loaded, count, true)
+                    updateIndexingProgress(slot, isData, loaded, count, true, sheetIndex == 1)
                 }
-                updateIndexingProgress(slot, isData, rows, total, false)
+                updateIndexingProgress(slot, isData, rows, total, false, sheetIndex == 1)
             } catch (_: CancellationException) {
                 // A newer replacement or removal superseded this background index.
-                updateIndexingProgress(slot, isData, rows, total, false)
+                updateIndexingProgress(slot, isData, rows, total, false, sheetIndex == 1)
             } catch (failure: Exception) {
-                updateIndexingProgress(slot, isData, rows, total, false)
+                updateIndexingProgress(slot, isData, rows, total, false, sheetIndex == 1)
                 Log.w("SortingViewModel", "Background index failed for $slot", failure)
             }
         }
     }
 
-    private fun updateIndexingProgress(slot: String, isData: Boolean, rows: Int, total: Int, active: Boolean) {
+    private fun updateIndexingProgress(slot: String, isData: Boolean, rows: Int, total: Int, active: Boolean, isChecking: Boolean = false) {
         _state.update { state ->
-            if (!isData) state.copy(walletIndexing = IndexingProgress(rows, total, active))
+            if (isChecking) state.copy(checkingIndexing = IndexingProgress(rows, total, active))
+            else if (!isData) state.copy(walletIndexing = IndexingProgress(rows, total, active))
             else if (slot == "sorting.data") state.copy(dataIndexing = IndexingProgress(rows, total, active))
             else state.copy(additionalDataIndexing = state.additionalDataIndexing.toMutableList().apply {
                 val index = slot.substringAfterLast('.').toIntOrNull()?.minus(1) ?: return@apply
