@@ -155,7 +155,9 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
             checkActive()
             if (keys == null) keys = aliases.mapIndexed { index, names ->
                 val normalizedNames = names.map(::normalizeHeader).toSet()
-                row.keys.firstOrNull { normalizeHeader(it) in normalizedNames }
+                row.keys.filter { normalizeHeader(it) in normalizedNames }
+                    .sortedWith(compareByDescending<String> { normalizeHeader(it).contains("عربي") })
+                    .firstOrNull()
                     ?: row.keys.firstOrNull { !isData && index == 1 && (normalizeHeader(it).contains("نوع") || normalizeHeader(it).contains("طراز")) }
             }
             val values = keys!!.map { key -> key?.let(row::get)?.takeIf { it.isNotBlank() } }

@@ -71,10 +71,10 @@ object SortingEngine {
 
     private fun findHeader(headers: Set<String>, aliases: Set<String>, allowColorColumn: Boolean = false): String? {
         val normalizedAliases = aliases.map(::normalizeHeader).toSet()
-        return headers.firstOrNull { header -> normalizeHeader(header) in normalizedAliases }
+        val matching = headers.filter { header -> normalizeHeader(header) in normalizedAliases }
+        return matching.sortedWith(compareByDescending<String> { normalizeHeader(it).contains("عربي") }).firstOrNull()
             ?: headers.firstOrNull { header -> allowColorColumn && normalizeHeader(header).contains(normalizeHeader("لون")) }
     }
-
     private fun normalizeHeader(value: String): String = ExcelHeaders.normalize(value)
 
     private fun firstValue(row: Map<String, String>, names: List<String>): String = firstValueOrNull(row, names).orEmpty()

@@ -10,6 +10,7 @@ import com.rased.feature.sorting.domain.SortingResult
 import java.io.Closeable
 import java.io.File
 import com.rased.core.excel.XlsxWriter
+import com.rased.core.excel.ExcelHeaders
 import java.io.Writer
 import java.io.OutputStream
 
@@ -131,11 +132,13 @@ class SortingStore(cacheDir: File) : ResultStore {
     }
 
     private fun value(row: Map<String, String>, aliases: Set<String>): String? {
-        val exact = row.entries.firstOrNull { it.key.trim().replace(" ", "") in aliases }?.value
-        val color = row.entries.firstOrNull { it.key.replace(" ", "").contains("لون") }?.value
+        val normalizedAliases = aliases.map(ExcelHeaders::normalize).toSet()
+        val exact = row.entries.filter { ExcelHeaders.normalize(it.key) in normalizedAliases }
+            .sortedWith(compareByDescending<Map.Entry<String, String>> { it.key.contains("عربي") })
+            .firstOrNull()?.value
+        val color = row.entries.firstOrNull { ExcelHeaders.normalize(it.key).contains("لون") }?.value
         return (exact ?: color)?.ifBlank { null }
     }
-
     companion object {
         const val PAGE_SIZE = 100
         private const val TSV_HEADER = "اللوحة\tالنوع\tالطراز\tالملاحظة\tالشارع\tالحي\tالتاريخ\tاللون\tالموقع"
