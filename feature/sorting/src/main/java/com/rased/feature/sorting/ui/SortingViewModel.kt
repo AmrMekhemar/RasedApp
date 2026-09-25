@@ -124,6 +124,7 @@ class SortingViewModel @JvmOverloads constructor(
             fileMutex.withLock {
                 try {
                     val saved = repository.replaceOrAddSecondData(uri, ::importProgress)
+                    scheduleBackgroundIndex(saved.slot, isData = true)
                     val additional = repository.loadAdditionalData()
                     _state.update { it.copy(additionalDataFileNames = additional.map { file -> file.displayName }) }
                 } catch (cancelled: CancellationException) { throw cancelled
@@ -231,17 +232,38 @@ class SortingViewModel @JvmOverloads constructor(
     }
     private fun scheduleBackgroundIndex(slot: String, isData: Boolean, sheetIndex: Int = 0) {
         backgroundIndexJobs[slot]?.cancel()
+        updateIndexingProgress(slot, isData, 0, 0, true)
         backgroundIndexJobs[slot] = viewModelScope.launch(Dispatchers.IO) {
+            var rows = 0
+            var total = 0
             try {
-                repository.indexSavedInput(slot, isData, sheetIndex)
+                repository.indexSavedInput(slot, isData, sheetIndex) { loaded, count ->
+                    rows = loaded
+                    total = count
+                    updateIndexingProgress(slot, isData, loaded, count, true)
+                }
+                updateIndexingProgress(slot, isData, rows, total, false)
             } catch (_: CancellationException) {
                 // A newer replacement or removal superseded this background index.
+                updateIndexingProgress(slot, isData, rows, total, false)
             } catch (failure: Exception) {
+                updateIndexingProgress(slot, isData, rows, total, false)
                 Log.w("SortingViewModel", "Background index failed for $slot", failure)
             }
         }
     }
 
+    private fun updateIndexingProgress(slot: String, isData: Boolean, rows: Int, total: Int, active: Boolean) {
+        _state.update { state ->
+            if (!isData) state.copy(walletIndexing = IndexingProgress(rows, total, active))
+            else if (slot == "sorting.data") state.copy(dataIndexing = IndexingProgress(rows, total, active))
+            else state.copy(additionalDataIndexing = state.additionalDataIndexing.toMutableList().apply {
+                val index = slot.substringAfterLast('.').toIntOrNull()?.minus(1) ?: return@apply
+                while (size <= index) add(null)
+                this[index] = IndexingProgress(rows, total, active)
+            })
+        }
+    }
     private fun finishFileOperation() {
         pendingFileOperations--
         _state.update { it.copy(isManagingFiles = pendingFileOperations > 0, fileProgress = null,
@@ -267,6 +289,7 @@ class SortingViewModel @JvmOverloads constructor(
             fileProgressRows = if (rows > 0) rows else it.fileProgressRows,
             fileProgressTotal = if (total > 0) total else it.fileProgressTotal) }
         val shouldNotify = rows == 0 || total > 0 || rows - lastNotificationRows >= 5000 ||
+                updateIndexingProgress(slot, isData, rows, total, false)
             (totalRows > 0 && loadedRows >= totalRows)
         if (!shouldNotify) return
         lastNotificationRows = loadedRows

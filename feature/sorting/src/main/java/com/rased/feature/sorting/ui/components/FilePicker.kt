@@ -17,6 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import com.rased.feature.sorting.ui.IndexingProgress
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -32,6 +33,7 @@ internal fun FilePickerCard(
     onRemove: (() -> Unit)? = null, removeEnabled: Boolean = true,
     additionalFileNames: List<String> = emptyList(), onAdd: (() -> Unit)? = null,
     addEnabled: Boolean = true, onPickAdditional: ((Int) -> Unit)? = null,
+    indexing: IndexingProgress? = null, additionalIndexing: List<IndexingProgress?> = emptyList(),
     onRemoveAdditional: ((Int) -> Unit)? = null
 ) {
     Card(
@@ -43,7 +45,7 @@ internal fun FilePickerCard(
             InputStepHeading(stepNumber, title, description)
             FilePickerInline(fileName, buttonText, onPick, additionalFileNames,
                 onRemove = onRemove, onPickAdditional = onPickAdditional,
-                onRemoveAdditional = onRemoveAdditional, removeEnabled = removeEnabled)
+                onRemoveAdditional = onRemoveAdditional, removeEnabled = removeEnabled, indexing = indexing, additionalIndexing = additionalIndexing)
             if (onAdd != null) {
                 OutlinedButton(onClick = onAdd, enabled = addEnabled, modifier = Modifier.fillMaxWidth()) {
                     Text("+ إضافة ملف داتا")
@@ -58,6 +60,7 @@ internal fun FilePickerInline(
     fileName: String?, text: String, onPick: () -> Unit,
     additionalFileNames: List<String> = emptyList(), onRemove: (() -> Unit)? = null,
     onPickAdditional: ((Int) -> Unit)? = null, onRemoveAdditional: ((Int) -> Unit)? = null,
+    indexing: IndexingProgress? = null, additionalIndexing: List<IndexingProgress?> = emptyList(),
     removeEnabled: Boolean = true
 ) {
     Column(
@@ -105,10 +108,18 @@ internal fun FilePickerInline(
             }
         }
         fileRow(fileName, 0, onPick, onRemove)
+        indexing?.let { IndexingText(it) }
         additionalFileNames.forEachIndexed { index, name ->
             fileRow(name, index + 1, { onPickAdditional?.invoke(index) }, { onRemoveAdditional?.invoke(index) })
+            additionalIndexing.getOrNull(index)?.let { IndexingText(it) }
         }
     }
+}
+
+@Composable
+private fun IndexingText(progress: IndexingProgress) {
+    val text = if (progress.total > 0) "فهرسة: ${progress.rows} / ${progress.total} صف (${progress.percentage}%)" else "جاري الفهرسة: ${progress.rows} صف"
+    Text(text, color = SortingStyle.Teal, style = MaterialTheme.typography.bodySmall)
 }
 
 @Preview(showBackground = true, locale = "ar")

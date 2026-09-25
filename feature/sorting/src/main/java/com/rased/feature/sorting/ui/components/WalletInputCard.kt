@@ -1,5 +1,7 @@
 package com.rased.feature.sorting.ui.components
 
+import com.rased.feature.sorting.ui.IndexingProgress
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -34,7 +36,8 @@ internal fun WalletInputCard(
     onUseTextWalletChange: (Boolean) -> Unit,
     onWalletTextChange: (String) -> Unit,
     onPickWallet: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    indexing: IndexingProgress? = null
 ) {
     Card(
         modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp),
@@ -73,7 +76,7 @@ internal fun WalletInputCard(
                     placeholder = { Text("امط8845\nبكب1234") }
                 )
             } else {
-                FilePickerInline(walletFileName, "اختيار ملف المحفظة", onPickWallet)
+                FilePickerInline(walletFileName, "اختيار ملف المحفظة", onPickWallet, indexing = indexing)
                 Text("سيتم قراءة أول شيت ظاهر في الملف", style = MaterialTheme.typography.bodySmall, color = SortingStyle.Muted)
             }
         }

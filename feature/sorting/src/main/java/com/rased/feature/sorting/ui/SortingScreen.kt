@@ -53,9 +53,7 @@ fun SortingScreen(
     onCancelFileOperation: () -> Unit = {}
 ) {
     SortingTheme {
-        if (state.isManagingFiles && state.fileProgress != null) {
-            FileImportProgressScreen(state.fileProgress, state.fileProgressRows, state.fileProgressTotal, onCancelFileOperation)
-        } else FeatureScaffold("قسم الفرز", onBack) { padding ->
+        FeatureScaffold("قسم الفرز", onBack) { padding ->
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
                 LazyColumn(
                     modifier = Modifier
@@ -87,6 +85,8 @@ fun SortingScreen(
                                             additionalFileNames = state.additionalDataFileNames,
                                             onAdd = if (state.additionalDataFileNames.size < 1) onAddData else null,
                                             addEnabled = !state.isLoading && !state.isExporting && !state.isManagingFiles,
+                                            indexing = state.dataIndexing,
+                                            additionalIndexing = state.additionalDataIndexing,
                                             onPickAdditional = onPickAdditionalData,
                                             onRemoveAdditional = { index -> onRemoveData(index + 1) },
                                             onRemove = { onRemoveData(0) },
@@ -96,6 +96,7 @@ fun SortingScreen(
                                         WalletInputCard(
                                             state.useTextWallet, state.walletText, state.walletFileName ?: state.walletFileUri?.lastPathSegment,
                                             onUseTextWalletChange, onWalletTextChange, onPickWallet,
+                                             indexing = state.walletIndexing,
                                             modifier = Modifier.width(cardWidth).fillMaxHeight()
                                         )
                                         FilePickerCard(
@@ -107,6 +108,7 @@ fun SortingScreen(
                                             stepNumber = "٣",
                                             onRemove = onRemoveChecking,
                                             removeEnabled = !state.isLoading && !state.isExporting && !state.isManagingFiles,
+                                             indexing = state.checkingIndexing,
                                             modifier = Modifier.width(cardWidth).fillMaxHeight()
                                         )
                                     }
@@ -120,16 +122,10 @@ fun SortingScreen(
                             onClick = onStartSorting,
                             modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
                             shape = RoundedCornerShape(16.dp),
-                            enabled = !state.isLoading && !state.isExporting && !state.isManagingFiles
+                            enabled = !state.isLoading && !state.isExporting && !state.isManagingFiles && !state.isIndexing
                         ) { Text(if (state.isLoading) "جاري الفرز..." else "ابدأ الفرز", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
                     }
 
-                    if (state.isManagingFiles) {
-                        item { Text(state.fileProgress ?: "جاري تجهيز الملفات المحفوظة...", color = MaterialTheme.colorScheme.primary) }
-                    }
-                    if (state.isManagingFiles && state.fileProgress != null) {
-                        item { SortingStatus(true, state.fileProgress) }
-                    }
                     if (state.isLoading || state.message != null) {
                         item { SortingStatus(state.isLoading, state.message) }
                     }

@@ -54,11 +54,13 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
             }
         }
 
-    suspend fun indexSavedInput(slot: String, isData: Boolean, sheetIndex: Int = 0) = withContext(Dispatchers.IO) {
-        val saved = files.get(slot) ?: return@withContext
-        val job = currentCoroutineContext()
-        database.runInTransaction {
-            ensureImported(saved, isData, { job.ensureActive() }, { _, _, _ -> }, sheetIndex)
+    suspend fun indexSavedInput(slot: String, isData: Boolean, sheetIndex: Int = 0, onProgress: (Int, Int) -> Unit = { _, _ -> }) = withContext(Dispatchers.IO) {
+        operationMutex.withLock {
+            val saved = files.get(slot) ?: return@withLock
+            val job = currentCoroutineContext()
+            database.runInTransaction {
+                ensureImported(saved, isData, { job.ensureActive() }, { _, rows, total -> onProgress(rows, total) }, sheetIndex)
+            }
         }
     }
 
