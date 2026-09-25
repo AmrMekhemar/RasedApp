@@ -55,37 +55,44 @@ internal fun SortingResultCard(result: SortingResult) {
         Column(Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)) {
             ResultCardHeader(result)
-            if (hasDetails) {
-                HorizontalDivider(color = CardLine)
-                TextButton(
-                    onClick = { expanded = !expanded },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).semantics {
-                        stateDescription = if (expanded) "موسّع" else "مطوي"
-                    },
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
-                ) {
-                    Text(if (expanded) "إخفاء التفاصيل" else "عرض التفاصيل")
-                }
-                AnimatedVisibility(visible = expanded) {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        if (hasAddress) {
-                            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                if (!result.district.isNullOrBlank())
-                                    AddressField("الحي", result.district, R.drawable.ic_result_pin, Modifier.weight(1f))
-//                                if (!result.district.isNullOrBlank() && !result.street.isNullOrBlank()) SectionDivider()
-                            }
-                        }
-                        if (hasFooter) ResultCardFooter(result)
-                        if (!result.note.isNullOrBlank()) {
-                            Text(buildAnnotatedString {
-                                withStyle(SpanStyle(color = CardMuted)) { append("الملاحظة: ") }
-                                append(result.note)
-                            }, color = CardInk, style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                }
+            if (hasFooter) ResultCardFooter(result)
+            if (hasDetails && !result.note.isNullOrBlank()) {
+                Text(buildAnnotatedString {
+                    withStyle(SpanStyle(color = CardMuted)) { append("الملاحظة: ") }
+                    append(result.note)
+                }, color = CardInk, style = MaterialTheme.typography.bodySmall)
             }
+//            if (hasDetails) {
+////                HorizontalDivider(color = CardLine)
+//                TextButton(
+//                    onClick = { expanded = !expanded },
+//                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).semantics {
+//                        stateDescription = if (expanded) "موسّع" else "مطوي"
+//                    },
+//                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+//                ) {
+//                    Text(if (expanded) "إخفاء التفاصيل" else "عرض التفاصيل")
+//                }
+//                AnimatedVisibility(visible = expanded) {
+//                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+////                        if (hasAddress) {
+////                            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+////                                horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+////                                if (!result.district.isNullOrBlank())
+////                                    AddressField("الحي", result.district, R.drawable.ic_result_pin, Modifier.weight(1f))
+//////                                if (!result.district.isNullOrBlank() && !result.street.isNullOrBlank()) SectionDivider()
+////                            }
+////                        }
+//                        if (hasFooter) ResultCardFooter(result)
+//                        if (!result.note.isNullOrBlank()) {
+//                            Text(buildAnnotatedString {
+//                                withStyle(SpanStyle(color = CardMuted)) { append("الملاحظة: ") }
+//                                append(result.note)
+//                            }, color = CardInk, style = MaterialTheme.typography.bodySmall)
+//                        }
+//                    }
+//                }
+//            }
         }
     }
 }
@@ -137,7 +144,8 @@ private fun ResultCardHeader(result: SortingResult) {
                         "النوع" to result.type,
                         "الطراز" to result.walletModel,
                         "اللون" to result.walletType,
-                        "الشارع" to result.street
+                        "الشارع" to result.street,
+                        "الحي" to result.district
                     ).filter { !it.second.isNullOrBlank() }
                     fields.forEachIndexed { index, (label, value) ->
                         if (index > 0) withStyle(SpanStyle(color = CardMuted)) { append("  |  ") }
