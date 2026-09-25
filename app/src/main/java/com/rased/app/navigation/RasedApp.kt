@@ -9,6 +9,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.rased.app.data.DummySessionStore
+import com.rased.app.access.requiresPaidVersion
 import com.rased.app.ui.home.HomeScreen
 import com.rased.app.ui.login.LoginScreen
 import com.rased.core.ui.RasedTheme
@@ -24,6 +25,7 @@ fun RasedApp() {
     val sessionStore = remember(context) { DummySessionStore(context) }
     var isLoggedIn by remember(sessionStore) { mutableStateOf(sessionStore.isLoggedIn) }
     var destination by rememberSaveable { mutableStateOf(Destination.Home) }
+    val paidRequired = remember { requiresPaidVersion() }
     val onBack = { destination = Destination.Home }
     BackHandler(enabled = isLoggedIn && destination != Destination.Home, onBack = onBack)
     RasedTheme {
@@ -33,11 +35,12 @@ fun RasedApp() {
                 destination = Destination.Home
                 isLoggedIn = true
             })
-        } else when (destination) {
+        } else when (if (paidRequired) Destination.Home else destination) {
             Destination.Home -> HomeScreen(
-                onOpenSorting = { destination = Destination.Sorting },
-                onOpenUnloading = { destination = Destination.Unloading },
-                onOpenChecking = { destination = Destination.Checking },
+                paidRequired = paidRequired,
+                onOpenSorting = { if (!paidRequired) destination = Destination.Sorting },
+                onOpenUnloading = { if (!paidRequired) destination = Destination.Unloading },
+                onOpenChecking = { if (!paidRequired) destination = Destination.Checking },
                 onLogout = {
                     sessionStore.logout()
                     destination = Destination.Home

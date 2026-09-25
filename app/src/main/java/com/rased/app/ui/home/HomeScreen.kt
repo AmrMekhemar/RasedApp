@@ -28,7 +28,10 @@ import com.rased.core.ui.RasedTheme
 import com.rased.app.BuildConfig
 
 @Composable
-fun HomeScreen(onOpenSorting: () -> Unit, onOpenUnloading: () -> Unit, onOpenChecking: () -> Unit, onLogout: () -> Unit) {
+fun HomeScreen(
+    onOpenSorting: () -> Unit, onOpenUnloading: () -> Unit, onOpenChecking: () -> Unit,
+    onLogout: () -> Unit, paidRequired: Boolean = false
+) {
     Scaffold(containerColor = HomeStyle.Background) { padding ->
         Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
             Column(
@@ -41,17 +44,20 @@ fun HomeScreen(onOpenSorting: () -> Unit, onOpenUnloading: () -> Unit, onOpenChe
                     Text("تسجيل الخروج")
                 }
                 HomeHero()
+                if (paidRequired) {
+                    PaidVersionNotice()
+                }
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("أدواتك", color = HomeStyle.Ink, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text("اختر القسم وابدأ إنجاز مهامك", color = HomeStyle.Muted, style = MaterialTheme.typography.bodyMedium)
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     FeatureCard("الفرز", "طابق ملف الداتا مع المحفظة، واحفظ نتائجك في Excel.",
-                        FeatureSymbol.Sorting, HomeStyle.Teal, onOpenSorting)
+                        FeatureSymbol.Sorting, HomeStyle.Teal, onOpenSorting, enabled = !paidRequired)
                     FeatureCard("التفريغ", "مساحة مخصصة لتفريغ البيانات.",
-                        FeatureSymbol.Unloading, HomeStyle.Purple, onOpenUnloading, comingSoon = true)
+                        FeatureSymbol.Unloading, HomeStyle.Purple, onOpenUnloading, comingSoon = true, enabled = !paidRequired)
                     FeatureCard("التشييك", "مساحة مخصصة لمراجعة اللوحات.",
-                        FeatureSymbol.Checking, HomeStyle.Amber, onOpenChecking, comingSoon = true)
+                        FeatureSymbol.Checking, HomeStyle.Amber, onOpenChecking, comingSoon = true, enabled = !paidRequired)
                 }
                 Column(modifier = Modifier.align(Alignment.CenterHorizontally),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -63,6 +69,19 @@ fun HomeScreen(onOpenSorting: () -> Unit, onOpenUnloading: () -> Unit, onOpenChe
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun PaidVersionNotice() {
+    Column(
+        Modifier.fillMaxWidth().background(Color(0xFFFFF4D6), RoundedCornerShape(18.dp)).padding(18.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text("يجب شراء النسخة المدفوعة لاستخدام التطبيق", color = Color(0xFF7A4D00),
+            style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text("للحصول على خدمات الفرز والتشييك والتفريغ، يرجى شراء النسخة المدفوعة.",
+            color = Color(0xFF7A4D00), style = MaterialTheme.typography.bodyMedium)
     }
 }
 

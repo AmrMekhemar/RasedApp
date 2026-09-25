@@ -30,13 +30,15 @@ internal fun FeatureCard(
     symbol: FeatureSymbol,
     accent: Color,
     onClick: () -> Unit,
-    comingSoon: Boolean = false
+    comingSoon: Boolean = false,
+    enabled: Boolean = true
 ) {
     Card(
         onClick = onClick,
+        enabled = enabled,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = if (enabled) Color.White else Color(0xFFF1F3F5)),
         border = BorderStroke(1.dp, if (comingSoon) Color(0xFFE7EBEF) else accent.copy(alpha = 0.25f)),
         elevation = CardDefaults.cardElevation(defaultElevation = if (comingSoon) 0.dp else 3.dp)
     ) {
