@@ -72,12 +72,19 @@ class XlsxReader(private val context: Context) {
                     val aliases = headerAliases.map(::normalizeHeader).toSet()
                     val selected = selectedHeaders?.map(::normalizeHeader)?.toSet()
                     var headers: Map<Int, String>? = null
+                    val firstRows = mutableListOf<Pair<Int, Map<Int, String>>>()
+                    fun emitRow(row: Map<Int, String>) {
+                        val mapped = linkedMapOf<String, String>()
+                        headers.orEmpty().forEach { (col, header) -> mapped[header] = row[col].orEmpty().trim() }
+                        if (mapped.values.any { it.isNotBlank() }) onRow(mapped)
+                    }
                     SheetHyperlinks(context.cacheDir).use { links ->
                     links.load(zip, target, checkActive)
                     zip.getInputStream(entry).use { input ->
                         parseSheet(input, sharedStrings, { column -> headers?.containsKey(column) != false },
                             { column -> headers?.get(column)?.let(::normalizeHeader) in setOf("الموقع", "موقع") },
-                            links::target, checkActive) { row ->
+                            links::target, checkActive) { rowNumber, row ->
+                            if (rowNumber <= 5) firstRows += rowNumber to row.toMap()
                             val currentHeaders = headers
                             if (currentHeaders == null) {
                                 if (row.values.any { normalizeHeader(it) in aliases }) {
@@ -86,14 +93,35 @@ class XlsxReader(private val context: Context) {
                                     }
                                 }
                             } else {
-                                val mapped = linkedMapOf<String, String>()
-                                currentHeaders.forEach { (col, header) -> mapped[header] = row[col].orEmpty().trim() }
-                                if (mapped.values.any { it.isNotBlank() }) onRow(mapped)
+                                emitRow(row)
+                            }
+                        }
+                    }
+                    if (headers == null) {
+                        val candidates = firstRows.flatMap { (_, row) ->
+                            row.filterValues(::looksLikePlate).keys
+                        }.groupingBy { it }.eachCount()
+                        val bestCount = candidates.values.maxOrNull()
+                        val best = candidates.filterValues { it == bestCount }.keys
+                        check(best.size <= 1) { "يوجد أكثر من عمود يحتمل أنه عمود اللوحة؛ سمّ العمود المطلوب «اللوحة» لتحديده." }
+                        best.singleOrNull()?.let { plateColumn ->
+                            val firstPlateRow = firstRows.first { looksLikePlate(it.second[plateColumn].orEmpty()) }.first
+                            val preceding = firstRows.lastOrNull { it.first < firstPlateRow && it.second.isNotEmpty() }?.second.orEmpty()
+                            headers = preceding.mapValues { it.value.trim() }.filterValues {
+                                it.isNotBlank() && (selected == null || normalizeHeader(it) in selected)
+                            } + (plateColumn to headerAliases.first())
+                            // Re-read only when no named header exists; keep the first actual plate.
+                            zip.getInputStream(entry).use { input ->
+                                parseSheet(input, sharedStrings, { it in headers.orEmpty() },
+                                    { headers?.get(it)?.let(::normalizeHeader) in setOf("الموقع", "موقع") },
+                                    links::target, checkActive) { rowNumber, row ->
+                                    if (rowNumber >= firstPlateRow) emitRow(row)
+                                }
                             }
                         }
                     }
                     }
-                    if (headers == null) error("لم يتم العثور على عمود اللوحة في الشيت. يجب وجود عنوان مثل «اللوحة» أو «رقم اللوحة»؛ باقي الأعمدة اختيارية.")
+                    if (headers == null) error("لم يتم العثور على عنوان معروف لعمود اللوحة أو لوحة من 3 حروف و4 أرقام في أول 5 صفوف؛ باقي الأعمدة اختيارية.")
                 }
             }
         } finally {
@@ -175,7 +203,7 @@ class XlsxReader(private val context: Context) {
 
     private fun parseSheet(input: InputStream, sharedStrings: SharedStrings,
         selectedColumn: (Int) -> Boolean, hyperlinkColumn: (Int) -> Boolean,
-        hyperlinkTarget: (String) -> String?, checkActive: () -> Unit, onRow: (Map<Int, String>) -> Unit) {
+        hyperlinkTarget: (String) -> String?, checkActive: () -> Unit, onRow: (Int, Map<Int, String>) -> Unit) {
         val currentRow = linkedMapOf<Int, String>()
         val parser = newParser(input)
 
@@ -184,11 +212,16 @@ class XlsxReader(private val context: Context) {
         var inlineText: String? = null
         var currentRef = ""
         var formulaTarget: String? = null
+        var rowNumber = 0
 
         while (parser.next() != XmlPullParser.END_DOCUMENT) {
             when (parser.eventType) {
                 XmlPullParser.START_TAG -> when (parser.name.substringAfter(':')) {
-                    "row" -> { checkActive(); currentRow.clear() }
+                    "row" -> {
+                        checkActive()
+                        rowNumber = parser.getAttributeValue(null, "r")?.toIntOrNull() ?: (rowNumber + 1)
+                        currentRow.clear()
+                    }
                     "c" -> {
                         val ref = parser.getAttributeValue(null, "r").orEmpty()
                         currentRef = ref
@@ -227,7 +260,7 @@ class XlsxReader(private val context: Context) {
                             }
                         }
                     }
-                    "row" -> onRow(currentRow)
+                    "row" -> onRow(rowNumber, currentRow)
                 }
             }
         }
@@ -308,6 +341,12 @@ class XlsxReader(private val context: Context) {
     }
 
     private fun normalizeHeader(value: String): String = ExcelHeaders.normalize(value)
+
+    private fun looksLikePlate(value: String): Boolean {
+        val compact = value.filterNot { it.isWhitespace() || Character.isSpaceChar(it) || Character.getType(it) == Character.FORMAT.toInt() }
+        return compact.length == 7 && compact.take(3).all { it in '\u0600'..'\u06FF' && it.isLetter() } &&
+            compact.takeLast(4).all { it in '0'..'9' || it in '٠'..'٩' || it in '۰'..'۹' }
+    }
 
     // Decode once so an escaped literal such as _x005F_x000A_ stays literal.
     private fun decodeExcelText(value: String): String = excelEscape.replace(value) {

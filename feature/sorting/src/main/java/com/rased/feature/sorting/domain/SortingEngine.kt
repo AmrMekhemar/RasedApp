@@ -3,7 +3,11 @@ package com.rased.feature.sorting.domain
 import com.rased.core.excel.ExcelHeaders
 
 object SortingEngine {
-    private val plateColumnNames = setOf("اللوحة", "اللوحه", "لوحة", "لوحه", "رقم اللوحة", "رقم اللوحه", "رقم لوحة", "رقم لوحه")
+    private val plateColumnNames = setOf(
+        "اللوحة", "اللوحه", "لوحة", "لوحه", "رقم اللوحة", "رقم اللوحه", "رقم لوحة", "رقم لوحه",
+        "لوحة المركبة", "لوحه المركبة", "لوحه المركبه", "لوحة المركبه", "رقم اللوحة عربي",
+        "Plate", "plate_num", "plate#"
+    )
     private val walletTypeNames = setOf("النوع", "الماركة", "الموديل")
 
     fun locationNames(): Set<String> = setOf("الموقع", "موقع")

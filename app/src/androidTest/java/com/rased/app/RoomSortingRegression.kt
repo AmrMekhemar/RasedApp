@@ -22,6 +22,7 @@ class RoomSortingRegression(private val context: Context) {
             verifyInputRecovery()
             verifyCheckingSplit()
             verifyPlateOnlyInputs()
+            verifyPlateDiscovery()
         }
         val repository = SortingRepository(context, "room.regression")
         val files = SavedFileStorage(context)
@@ -120,6 +121,46 @@ class RoomSortingRegression(private val context: Context) {
             check(it.readPage(0, 100).single().note == "updated")
             check(it.readPage(0, 100).single().walletType == "replacement")
         }
+    }
+
+    private suspend fun verifyPlateDiscovery() {
+        val repository = SortingRepository(context, "room.discovery")
+        val source = File.createTempFile("discovery-", ".xlsx", context.cacheDir)
+        try {
+            suspend fun verify(expected: Int) {
+                repository.replaceInput(Uri.fromFile(source), true)
+                repository.replaceInput(Uri.fromFile(source), false)
+                repository.replaceChecking(Uri.fromFile(source))
+                val result = repository.sort(useChecking = true)
+                result.store.use { check(result.count == 0) }
+                requireNotNull(result.oldStore).use { check(result.oldCount == expected) }
+            }
+            for (name in SortingEngine.plateNames() + setOf("PLATE", "Plate_Num")) {
+                write(source, listOf(name), listOf(listOf("محد1234")))
+                verify(1)
+            }
+            // Unknown heading, optional columns retained, and spaced Arabic digits.
+            write(source, listOf("غير معروف", "الملاحظة"), listOf(listOf("م ح د ١٢٣٤", "note"), listOf("محد5678", "next")))
+            verify(2)
+            repository.sort().store.use { check(it.readPage(0, 10).first().note == "note") }
+            // Headerless: the first plate must not be discarded.
+            write(source, listOf("محد1234"), listOf(listOf("م ح د1245"), listOf("م ح د 1235")))
+            verify(3)
+            // A recognized header takes precedence over a plate-like value in another column.
+            write(source, listOf("محد9999", "Plate"), listOf(listOf("محد8888", "محد1234")))
+            verify(1)
+            repository.sort().store.use { check(it.readPage(0, 10).single().plate == "محد1234") }
+            write(source, listOf("unknown"), List(3) { listOf("text") } + listOf(listOf("محد1234")))
+            verify(1) // Excel row 5.
+            write(source, listOf("unknown"), List(4) { listOf("text") } + listOf(listOf("محد1234")))
+            check(runCatching { repository.replaceInput(Uri.fromFile(source), false) }.isFailure)
+            for (invalid in listOf("مح1234", "محد123", "محد12345", "text محد1234")) {
+                write(source, listOf("unknown"), listOf(listOf(invalid)))
+                check(runCatching { repository.replaceInput(Uri.fromFile(source), false) }.isFailure)
+            }
+            write(source, listOf("one", "two"), listOf(listOf("محد1234", "محد5678")))
+            check(runCatching { repository.replaceInput(Uri.fromFile(source), false) }.isFailure)
+        } finally { source.delete() }
     }
 
     private suspend fun verifyPlateOnlyInputs() {

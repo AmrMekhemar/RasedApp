@@ -194,7 +194,7 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
 
     private companion object {
         val operationMutex = Mutex()
-        const val PARSER_VERSION = 5
+        const val PARSER_VERSION = 6
         val DATA_COLUMNS = listOf(SortingEngine.plateNames(), setOf("النوع"), setOf("الملاحظة", "ملاحظة", "الملاحظات"),
             setOf("الشارع", "شارع"), setOf("الحي", "حى"), setOf("التاريخ", "تاريخ"), SortingEngine.locationNames())
         fun normalizeHeader(value: String) = ExcelHeaders.normalize(value)
