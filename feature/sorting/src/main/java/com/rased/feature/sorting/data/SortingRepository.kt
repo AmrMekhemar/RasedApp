@@ -74,7 +74,7 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
             val saved = files.listByPrefix("$slotPrefix.data.extra.")
             val job = currentCoroutineContext()
             database.runInTransaction {
-                saved.forEach { ensureImported(it, true, { job.ensureActive() }) { _, _ -> } }
+                saved.forEach { ensureImported(it, true, { job.ensureActive() }, { _, _ -> }) }
             }
             saved
         }
@@ -137,7 +137,7 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
         operationMutex.withLock {
             val saved = files.get("$slotPrefix.checking") ?: return@withLock null
             val job = currentCoroutineContext()
-            database.runInTransaction { ensureImported(saved, false, { job.ensureActive() }) { _, _ -> } }
+            database.runInTransaction { ensureImported(saved, false, { job.ensureActive() }, { _, _ -> }, sheetIndex = 1) }
             saved
         }
     }
@@ -146,12 +146,12 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
         operationMutex.withLock {
             val job = currentCoroutineContext()
             files.replace("$slotPrefix.checking", uri) { saved, _ ->
-                ensureImported(saved, false, { job.ensureActive() }) { _, _ -> }
+                ensureImported(saved, false, { job.ensureActive() }, { _, _ -> }, sheetIndex = 1)
             }
         }
     }
 
-    private fun ensureImported(saved: SavedFile, isData: Boolean, checkActive: () -> Unit, progress: (Boolean, Int) -> Unit) {
+    private fun ensureImported(saved: SavedFile, isData: Boolean, checkActive: () -> Unit, progress: (Boolean, Int) -> Unit, sheetIndex: Int = 0) {
         val revision = "${saved.fileName}:$PARSER_VERSION"
         val previous = dao.imported(saved.slot)
         if (previous?.revision == revision && previous.parserVersion == PARSER_VERSION) return
@@ -164,7 +164,7 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
         var sequence = 0L
         val aliases = if (isData) DATA_COLUMNS else listOf(SortingEngine.plateNames(), SortingEngine.walletTypeNames(), SortingEngine.locationNames())
         progress(isData, 0)
-        reader.forEachSelectedRow(files.uri(saved), null, SortingEngine.plateNames(), aliases.flatten().toSet(), checkActive) { row ->
+        reader.forEachSelectedRow(files.uri(saved), null, SortingEngine.plateNames(), aliases.flatten().toSet(), checkActive, { row ->
             checkActive()
             if (keys == null) keys = aliases.map { names ->
                 val normalizedNames = names.map(::normalizeHeader).toSet()
@@ -181,7 +181,7 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
             if (dataBatch.size >= 64) { dao.insertData(dataBatch); dataBatch.clear() }
             if (walletBatch.size >= 64) { dao.insertWallet(walletBatch); walletBatch.clear() }
             if (sequence % 1000L == 0L) progress(isData, sequence.toInt())
-        }
+        }, visibleSheetIndex = sheetIndex)
         if (dataBatch.isNotEmpty()) dao.insertData(dataBatch)
         if (walletBatch.isNotEmpty()) dao.insertWallet(walletBatch)
         checkActive()
@@ -217,7 +217,7 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
                     job.ensureActive()
                     check(dataFiles.isNotEmpty()) { "اختر ملف الداتا أولًا" }
                     val revisions = dataFiles.map { saved ->
-                        ensureImported(saved, true, { job.ensureActive() }) { _, _ -> }
+                        ensureImported(saved, true, { job.ensureActive() }, { _, _ -> })
                         requireNotNull(dao.imported(saved.slot)).revision
                     }
                     val dataRevision = if (revisions.size == 1) revisions.single() else {
@@ -261,7 +261,7 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
 
     private companion object {
         val operationMutex = Mutex()
-        const val PARSER_VERSION = 6
+        const val PARSER_VERSION = 7
         val DATA_COLUMNS = listOf(SortingEngine.plateNames(), setOf("النوع"), setOf("الملاحظة", "ملاحظة", "الملاحظات"),
             setOf("الشارع", "شارع"), setOf("الحي", "حى"), setOf("التاريخ", "تاريخ"), SortingEngine.locationNames())
         fun normalizeHeader(value: String) = ExcelHeaders.normalize(value)

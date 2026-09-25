@@ -40,7 +40,8 @@ class XlsxReader(private val context: Context) {
         headerAliases: Set<String>,
         selectedHeaders: Set<String>?,
         checkActive: () -> Unit,
-        onRow: (Map<String, String>) -> Unit
+        onRow: (Map<String, String>) -> Unit,
+        visibleSheetIndex: Int = 0
     ) {
         // Private file URIs are seekable already. Only spool external content providers.
         val temporary = uri.scheme != "file"
@@ -61,7 +62,7 @@ class XlsxReader(private val context: Context) {
                 }
             }
             ZipFile(file).use { zip ->
-                val target = findSheetTarget(zip, sheetName)
+                val target = findSheetTarget(zip, sheetName, visibleSheetIndex)
                     ?: error(if (sheetName == null) "لم يتم العثور على شيت ظاهر في الملف" else "لم يتم العثور على شيت باسم \"$sheetName\"")
                 SharedStrings(context.cacheDir).use { sharedStrings ->
                     zip.getEntry("xl/sharedStrings.xml")?.let { entry ->
@@ -129,12 +130,14 @@ class XlsxReader(private val context: Context) {
         }
     }
 
-    private fun findSheetTarget(zip: ZipFile, wantedName: String?): String? {
+    private fun findSheetTarget(zip: ZipFile, wantedName: String?, visibleSheetIndex: Int): String? {
         val workbook = zip.getEntry("xl/workbook.xml") ?: return null
         val rels = zip.getEntry("xl/_rels/workbook.xml.rels") ?: return null
         val relMap = zip.getInputStream(rels).use { parseWorkbookRelationships(it) }
 
         var resultRid: String? = null
+        var visibleIndex = 0
+        var sheetOrdinal = 0
         zip.getInputStream(workbook).use { input ->
             val parser = newParser(input)
             while (parser.next() != XmlPullParser.END_DOCUMENT) {
@@ -145,7 +148,11 @@ class XlsxReader(private val context: Context) {
                         ?: parser.getAttributeValue(null, "id")
                     val state = parser.getAttributeValue(null, "state")
                     val visible = state != "hidden" && state != "veryHidden"
-                    if ((wantedName == null && visible) || (wantedName != null && name?.trim() == wantedName.trim())) {
+                    val matches = if (wantedName == null && visibleSheetIndex == 1) sheetOrdinal == 1
+                        else if (wantedName == null) visible && visibleIndex++ == visibleSheetIndex
+                        else name?.trim() == wantedName.trim()
+                    sheetOrdinal++
+                    if (matches) {
                         resultRid = rid
                         break
                     }
