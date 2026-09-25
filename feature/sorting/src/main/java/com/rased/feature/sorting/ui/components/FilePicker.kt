@@ -6,10 +6,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -68,9 +71,14 @@ internal fun FilePickerInline(
                 Text(name ?: "اختر الملف من جهازك", Modifier.weight(1f), maxLines = 2,
                     overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, color = SortingStyle.Ink)
                 OutlinedButton(onClick = change, enabled = name != null || index == 0,
-                    modifier = Modifier.weight(0.55f), shape = RoundedCornerShape(10.dp),
-                    border = BorderStroke(1.dp, SortingStyle.Teal.copy(alpha = 0.35f))) {
-                    Text(if (name == null) text else "تغيير")
+                    modifier = if (name == null) Modifier.size(44.dp) else Modifier.weight(0.55f),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = if (name == null) PaddingValues(0.dp) else ButtonDefaults.ContentPadding,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = SortingStyle.Teal),
+                    border = BorderStroke(1.dp, SortingStyle.Teal.copy(alpha = 0.65f))) {
+                    Text(if (name == null) "+" else "تغيير", color = SortingStyle.Teal,
+                        style = if (name == null) MaterialTheme.typography.headlineSmall
+                        else MaterialTheme.typography.labelMedium)
                 }
                 if (remove != null && name != null) TextButton(onClick = remove, enabled = removeEnabled) {
                     Text("حذف", color = MaterialTheme.colorScheme.error)
