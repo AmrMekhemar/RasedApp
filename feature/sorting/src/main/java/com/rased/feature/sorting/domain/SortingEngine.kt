@@ -45,6 +45,7 @@ object SortingEngine {
                 district = firstValueOrNull(dataRow, listOf("الحي", "حى")),
                 date = firstValueOrNull(dataRow, listOf("التاريخ", "تاريخ")),
                 walletType = walletTypeHeader?.let { walletRow[it].orEmpty().ifBlank { null } },
+                walletModel = WalletHeaders.modelValue(walletRow),
                 location = firstValueOrNull(dataRow, locationNames().toList()) ?: firstValueOrNull(walletRow, locationNames().toList())
             )
         }

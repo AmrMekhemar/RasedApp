@@ -282,10 +282,17 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
 
     private companion object {
         val operationMutex = Mutex()
-        const val PARSER_VERSION = 10
+        const val PARSER_VERSION = 11
         const val IMPORT_BATCH_SIZE = 512
-        val DATA_COLUMNS = listOf(SortingEngine.plateNames(), setOf("ط§ظ„ظ†ظˆط¹"), setOf("ط§ظ„ظ…ظ„ط§ط­ط¸ط©", "ظ…ظ„ط§ط­ط¸ط©", "ط§ظ„ظ…ظ„ط§ط­ط¸ط§طھ"),
-            setOf("ط§ظ„ط´ط§ط±ط¹", "ط´ط§ط±ط¹"), setOf("ط§ظ„ط­ظٹ", "ط­ظ‰"), setOf("ط§ظ„طھط§ط±ظٹط®", "طھط§ط±ظٹط®"), SortingEngine.locationNames())
+        val DATA_COLUMNS = listOf(
+            SortingEngine.plateNames(),
+            setOf("النوع"),
+            setOf("الملاحظة", "ملاحظة", "الملاحظات"),
+            setOf("الشارع", "شارع"),
+            setOf("الحي", "حى"),
+            setOf("التاريخ", "تاريخ"),
+            SortingEngine.locationNames()
+        )
         fun normalizeHeader(value: String) = ExcelHeaders.normalize(value)
     }
 }
