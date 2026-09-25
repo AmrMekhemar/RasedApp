@@ -81,22 +81,31 @@ class XlsxReader(private val context: Context) {
                     }
                     SheetHyperlinks(context.cacheDir).use { links ->
                     links.load(zip, target, checkActive)
-                    zip.getInputStream(entry).use { input ->
-                        parseSheet(input, sharedStrings, { column -> headers?.containsKey(column) != false },
-                            { column -> headers?.get(column)?.let(::normalizeHeader) in setOf("الموقع", "موقع") },
-                            links::target, checkActive) { rowNumber, row ->
-                            if (rowNumber <= 5) firstRows += rowNumber to row.toMap()
-                            val currentHeaders = headers
-                            if (currentHeaders == null) {
-                                if (row.values.any { normalizeHeader(it) in aliases }) {
-                                    headers = row.mapValues { it.value.trim() }.filterValues {
-                                        it.isNotBlank() && (selected == null || normalizeHeader(it) in selected)
+                    // Header discovery only needs the first 25 rows. Continuing through a
+                    // large sheet when no header exists caused a second full sheet pass for
+                    // the plate-pattern fallback.
+                    val headerScanLimit = 25
+                    try {
+                        zip.getInputStream(entry).use { input ->
+                            parseSheet(input, sharedStrings, { column -> headers?.containsKey(column) != false },
+                                { column -> headers?.get(column)?.let(::normalizeHeader) in setOf("الموقع", "موقع") },
+                                links::target, checkActive) { rowNumber, row ->
+                                if (rowNumber <= 5) firstRows += rowNumber to row.toMap()
+                                val currentHeaders = headers
+                                if (currentHeaders == null) {
+                                    if (row.values.any { normalizeHeader(it) in aliases }) {
+                                        headers = row.mapValues { it.value.trim() }.filterValues {
+                                            it.isNotBlank() && (selected == null || normalizeHeader(it) in selected)
+                                        }
                                     }
+                                    if (headers == null && rowNumber >= headerScanLimit) throw HeaderScanFinished
+                                } else {
+                                    emitRow(row)
                                 }
-                            } else {
-                                emitRow(row)
                             }
                         }
+                    } catch (_: HeaderScanFinished) {
+                        // The fallback below uses only the first five rows.
                     }
                     if (headers == null) {
                         val candidates = firstRows.flatMap { (_, row) ->
@@ -348,6 +357,8 @@ class XlsxReader(private val context: Context) {
     }
 
     private fun normalizeHeader(value: String): String = ExcelHeaders.normalize(value)
+
+    private object HeaderScanFinished : RuntimeException(null, null, false, false)
 
     private fun looksLikePlate(value: String): Boolean {
         val compact = value.filterNot { it.isWhitespace() || Character.isSpaceChar(it) || Character.getType(it) == Character.FORMAT.toInt() }
