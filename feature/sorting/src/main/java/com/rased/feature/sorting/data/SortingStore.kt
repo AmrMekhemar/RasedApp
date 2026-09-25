@@ -135,6 +135,6 @@ class SortingStore(cacheDir: File) : ResultStore {
 
     companion object {
         const val PAGE_SIZE = 100
-        private const val TSV_HEADER = "اللوحة\tالنوع\tالملاحظة\tالشارع\tالحي\tالتاريخ\tنوع المحفظة\tالموقع"
+        private const val TSV_HEADER = "اللوحة\tالنوع\tالملاحظة\tالشارع\tالحي\tالتاريخ\tاللون\tالموقع"
     }
 }

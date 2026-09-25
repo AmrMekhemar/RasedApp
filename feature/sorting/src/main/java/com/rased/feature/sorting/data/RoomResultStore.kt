@@ -54,6 +54,6 @@ internal class RoomResultStore(private val dao: SortingDao, private val runId: S
     }
 
     private companion object {
-        const val HEADER = "اللوحة\tالنوع\tالملاحظة\tالشارع\tالحي\tالتاريخ\tنوع المحفظة\tالموقع"
+        const val HEADER = "اللوحة\tالنوع\tالملاحظة\tالشارع\tالحي\tالتاريخ\tاللون\tالموقع"
     }
 }

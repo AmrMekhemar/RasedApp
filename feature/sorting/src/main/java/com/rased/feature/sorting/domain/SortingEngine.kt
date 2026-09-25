@@ -8,7 +8,7 @@ object SortingEngine {
         "لوحة المركبة", "لوحه المركبة", "لوحه المركبه", "لوحة المركبه", "رقم اللوحة عربي",
         "Plate", "plate_num", "plate#"
     )
-    private val walletTypeNames = setOf("النوع", "الماركة", "الموديل")
+    private val walletTypeNames = setOf("اللون", "لون", "color", "colour")
 
     fun locationNames(): Set<String> = setOf("الموقع", "موقع")
 
@@ -21,7 +21,7 @@ object SortingEngine {
 
         val walletPlateHeader = findHeader(walletRows.firstOrNull()?.keys.orEmpty(), plateColumnNames)
             ?: error("لم يتم العثور على عمود اللوحة في شيت المحفظة")
-        val walletTypeHeader = findHeader(walletRows.firstOrNull()?.keys.orEmpty(), walletTypeNames)
+        val walletTypeHeader = findHeader(walletRows.firstOrNull()?.keys.orEmpty(), walletTypeNames, allowColorColumn = true)
 
         val dataIndex = linkedMapOf<String, Map<String, String>>()
         dataRows.forEach { row ->
@@ -62,15 +62,17 @@ object SortingEngine {
     }
 
     fun resultsToTsv(results: List<SortingResult>): String {
-        val header = listOf("اللوحة", "النوع", "الملاحظة", "الشارع", "الحي", "التاريخ", "نوع المحفظة", "الموقع").joinToString("\t")
+        val header = listOf("اللوحة", "النوع", "الملاحظة", "الشارع", "الحي", "التاريخ", "اللون", "الموقع").joinToString("\t")
         return buildString {
             appendLine(header)
             results.forEach { appendLine(it.toTsvRow()) }
         }.trimEnd()
     }
 
-    private fun findHeader(headers: Set<String>, aliases: Set<String>): String? {
-        return headers.firstOrNull { header -> normalizeHeader(header) in aliases.map(::normalizeHeader) }
+    private fun findHeader(headers: Set<String>, aliases: Set<String>, allowColorColumn: Boolean = false): String? {
+        val normalizedAliases = aliases.map(::normalizeHeader).toSet()
+        return headers.firstOrNull { header -> normalizeHeader(header) in normalizedAliases }
+            ?: headers.firstOrNull { header -> allowColorColumn && normalizeHeader(header).contains(normalizeHeader("لون")) }
     }
 
     private fun normalizeHeader(value: String): String = ExcelHeaders.normalize(value)

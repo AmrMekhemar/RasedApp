@@ -46,7 +46,7 @@ private val resultColumns = listOf(
     ResultColumn("الشارع", 180.dp) { it.street },
     ResultColumn("الحي", 160.dp) { it.district },
     ResultColumn("التاريخ", 180.dp) { it.date },
-    ResultColumn("نوع المحفظة", 180.dp) { it.walletType },
+    ResultColumn("اللون", 180.dp) { it.walletType },
     ResultColumn("الموقع", 220.dp) { it.location }
 )
 

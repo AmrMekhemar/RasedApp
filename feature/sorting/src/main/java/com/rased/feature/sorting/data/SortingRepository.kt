@@ -166,9 +166,10 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
         progress(isData, 0, 0)
         reader.forEachSelectedRow(files.uri(saved), null, SortingEngine.plateNames(), aliases.flatten().toSet(), checkActive, { row ->
             checkActive()
-            if (keys == null) keys = aliases.map { names ->
+            if (keys == null) keys = aliases.mapIndexed { index, names ->
                 val normalizedNames = names.map(::normalizeHeader).toSet()
                 row.keys.firstOrNull { normalizeHeader(it) in normalizedNames }
+                    ?: row.keys.firstOrNull { !isData && index == 1 && normalizeHeader(it).contains(normalizeHeader("لون")) }
             }
             val values = keys!!.map { key -> key?.let(row::get)?.takeIf { it.isNotBlank() } }
             val plate = values[0]

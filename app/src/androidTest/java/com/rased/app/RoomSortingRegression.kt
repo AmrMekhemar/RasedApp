@@ -68,7 +68,7 @@ class RoomSortingRegression(private val context: Context) {
                     val exported = XlsxReader(context).readSheet(Uri.fromFile(export), null, SortingEngine.plateNames())
                     check(exported.map { it["الموقع"] } == listOf("wallet-location", "data-location"))
                     check(exported.map { it["الملاحظة"] } == listOf("second", "first"))
-                    check(exported.map { it["نوع المحفظة"] } == listOf("wallet-first", "wallet-second"))
+                    check(exported.map { it["اللون"] } == listOf("wallet-first", "wallet-second"))
 
                     source.writeText("not a workbook")
                     check(runCatching { repository.replaceInput(Uri.fromFile(source), true) }.isFailure)

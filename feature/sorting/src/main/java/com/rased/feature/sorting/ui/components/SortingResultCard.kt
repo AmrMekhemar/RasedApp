@@ -145,7 +145,7 @@ private fun ResultCardHeader(result: SortingResult) {
                         withStyle(SpanStyle(color = CardMuted)) { append("  |  ") }
                     }
                     if (!result.walletType.isNullOrBlank()) {
-                        withStyle(SpanStyle(color = CardMuted)) { append("موديل السيارة: ") }
+                        withStyle(SpanStyle(color = CardMuted)) { append("اللون: ") }
                         append(result.walletType)
                     }
                 }, color = CardInk, style = MaterialTheme.typography.bodySmall)
@@ -229,7 +229,7 @@ private fun ResultCardFooter(result: SortingResult) {
 
 private fun SortingResult.cardDetails(): String = listOf(
     "اللوحة" to plate, "النوع" to type, "الحي" to district, "الشارع" to street,
-    "الموقع" to location, "التاريخ" to date, "نوع المحفظة" to walletType, "الملاحظة" to note
+    "الموقع" to location, "التاريخ" to date, "اللون" to walletType, "الملاحظة" to note
 ).filter { (_, value) -> !value.isNullOrBlank() }
     .joinToString("\n") { (label, value) -> "$label: $value" }
 
