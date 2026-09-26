@@ -26,10 +26,10 @@ object SortingEngine {
             ?: error("لم يتم العثور على عمود اللوحة في شيت المحفظة")
         val walletTypeHeader = findHeader(walletRows.firstOrNull()?.keys.orEmpty(), walletTypeNames, allowColorColumn = true)
 
-        val dataIndex = linkedMapOf<String, Map<String, String>>()
+        val dataIndex = linkedMapOf<String, MutableList<Map<String, String>>>()
         dataRows.forEach { row ->
             val normalized = PlateNormalizer.normalize(row[dataPlateHeader]) ?: return@forEach
-            dataIndex.putIfAbsent(normalized, row)
+            dataIndex.getOrPut(normalized) { mutableListOf() }.add(row)
         }
 
         val seenWalletPlates = mutableSetOf<String>()
@@ -39,7 +39,8 @@ object SortingEngine {
             val normalized = PlateNormalizer.normalize(walletRow[walletPlateHeader]) ?: return@forEach
             if (!seenWalletPlates.add(normalized)) return@forEach
 
-            val dataRow = dataIndex[normalized] ?: return@forEach
+            val matches = dataIndex[normalized] ?: return@forEach
+            for (dataRow in matches) {
             results += SortingResult(
                 plate = dataRow[dataPlateHeader].orEmpty(),
                 type = firstValueOrNull(dataRow, listOf("النوع", "نوع")),
@@ -51,6 +52,7 @@ object SortingEngine {
                 walletModel = WalletHeaders.modelValue(walletRow),
                 location = firstValueOrNull(dataRow, locationNames().toList()) ?: firstValueOrNull(walletRow, locationNames().toList())
             )
+            }
         }
 
         return results

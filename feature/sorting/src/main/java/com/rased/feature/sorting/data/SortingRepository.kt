@@ -176,7 +176,7 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
             val plate = values[0]
             val normalized = PlateNormalizer.normalize(plate)
             if (normalized != null) {
-                if (isData) dataBatch += IndexedDataRow(revision, normalized, plate!!, values[1], values[2], values[3], values[4], values[5], values[6])
+                if (isData) dataBatch += IndexedDataRow(revision, normalized, plate!!, values[1], values[2], values[3], values[4], values[5], values[6], sequence)
                 else walletBatch += IndexedWalletRow(revision, normalized, sequence, values[2], values[3], values[1], values[4], values[5])
             }
             sequence++
@@ -226,7 +226,7 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
                         requireNotNull(dao.imported(saved.slot)).revision
                     }
                     val dataRevision = if (revisions.size == 1) revisions.single() else {
-                        // First added file wins for repeated plates, matching the existing first-row rule.
+                        // Keep every row, ordered by file selection and then workbook row.
                         revisions.forEach { job.ensureActive(); dao.mergeData(it, runId) }
                         runId
                     }
@@ -272,7 +272,7 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
 
     private companion object {
         val operationMutex = Mutex()
-        const val PARSER_VERSION = 13
+        const val PARSER_VERSION = 14
         const val IMPORT_BATCH_SIZE = 512
         val DATA_COLUMNS = listOf(
             SortingEngine.plateNames(),

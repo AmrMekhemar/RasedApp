@@ -12,10 +12,12 @@ import androidx.room.Upsert
 @Entity(tableName = "sorting_imports")
 data class SortingImport(@PrimaryKey val slot: String, val revision: String, val parserVersion: Int)
 
-@Entity(tableName = "sorting_data", primaryKeys = ["revision", "normalized"])
+@Entity(tableName = "sorting_data", primaryKeys = ["revision", "sequence"],
+    indices = [Index(value = ["revision", "normalized"])])
 data class IndexedDataRow(
     val revision: String, val normalized: String, val plate: String,
-    val type: String?, val note: String?, val street: String?, val district: String?, val date: String?, val location: String? = null
+    val type: String?, val note: String?, val street: String?, val district: String?, val date: String?, val location: String? = null,
+    val sequence: Long = 0
 )
 
 @Entity(tableName = "sorting_wallet", primaryKeys = ["revision", "normalized"],
@@ -39,15 +41,17 @@ interface SortingDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE) fun insertData(rows: List<IndexedDataRow>)
     @Insert(onConflict = OnConflictStrategy.IGNORE) fun insertWallet(rows: List<IndexedWalletRow>)
     @Query("DELETE FROM sorting_data WHERE revision = :revision") fun deleteData(revision: String)
-    @Query("""INSERT OR IGNORE INTO sorting_data(revision,normalized,plate,type,note,street,district,date,location)
-        SELECT :target,normalized,plate,type,note,street,district,date,location FROM sorting_data WHERE revision = :source""")
+    @Query("""INSERT INTO sorting_data(revision,normalized,plate,type,note,street,district,date,location,sequence)
+        SELECT :target,normalized,plate,type,note,street,district,date,location,
+        sequence + (SELECT COALESCE(MAX(sequence) + 1, 0) FROM sorting_data WHERE revision = :target)
+        FROM sorting_data WHERE revision = :source""")
     fun mergeData(source: String, target: String)
     @Query("DELETE FROM sorting_wallet WHERE revision = :revision") fun deleteWallet(revision: String)
 
     @Query("""INSERT INTO sorting_results(runId,plate,type,note,street,district,date,walletType,location,walletModel)
         SELECT :runId,d.plate,d.type,COALESCE(d.note,w.note),d.street,COALESCE(d.district,w.district),d.date,w.walletType,COALESCE(d.location,w.location),w.walletModel
         FROM sorting_wallet w JOIN sorting_data d ON d.revision = :dataRevision AND d.normalized = w.normalized
-        WHERE w.revision = :walletRevision ORDER BY w.sequence""")
+        WHERE w.revision = :walletRevision ORDER BY w.sequence,d.sequence""")
     fun match(runId: String, dataRevision: String, walletRevision: String)
 
     @Query("""INSERT INTO sorting_results(runId,plate,type,note,street,district,date,walletType,location,walletModel)
@@ -55,7 +59,7 @@ interface SortingDao {
         FROM sorting_wallet w JOIN sorting_data d ON d.revision = :dataRevision AND d.normalized = w.normalized
         WHERE w.revision = :walletRevision
         AND EXISTS (SELECT 1 FROM sorting_wallet c WHERE c.revision = :checkingRevision AND c.normalized = w.normalized) = :old
-        ORDER BY w.sequence""")
+        ORDER BY w.sequence,d.sequence""")
     fun matchChecked(runId: String, dataRevision: String, walletRevision: String, checkingRevision: String, old: Boolean)
 
     @Query("SELECT COUNT(*) FROM sorting_results WHERE runId = :runId") fun count(runId: String): Int

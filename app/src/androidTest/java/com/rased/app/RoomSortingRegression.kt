@@ -16,6 +16,73 @@ import kotlinx.coroutines.runBlocking
 
 /** Production repository checks in dedicated slots, preserving the user's inputs. */
 class RoomSortingRegression(private val context: Context) {
+    fun verifyDuplicateData() = runBlocking {
+        val prefix = "duplicates.${java.util.UUID.randomUUID()}"
+        val repository = SortingRepository(context, prefix)
+        val files = SavedFileStorage(context)
+        val dao = RasedDatabase.getInstance(context).sorting()
+        val source = File.createTempFile("duplicates-", ".xlsx", context.cacheDir)
+        val export = File.createTempFile("duplicates-export-", ".xlsx", context.cacheDir)
+        try {
+            write(source, listOf("اللوحة", "الملاحظة"), listOf(
+                listOf("ابج1234", "first"), listOf("أ ب ج ١٢٣٤", "second"), listOf("دهو5678", "other")
+            ))
+            repository.replaceInput(Uri.fromFile(source), true)
+            write(source, listOf("اللوحة"), listOf(listOf("ابج1234")))
+            repository.replaceInput(Uri.fromFile(source), false)
+            repository.sort().store.use {
+                check(it.readPage(0, 10).map { row -> row.note } == listOf("first", "second"))
+            }
+            write(source, listOf("اللوحة", "الملاحظة"), listOf(listOf("ابج1234", "third")))
+            repository.addData(Uri.fromFile(source))
+            // Duplicate wallet entries must not multiply the data rows again.
+            write(source, listOf("اللوحة"), listOf(listOf("ابج1234"), listOf("ابج1234")))
+            repository.replaceInput(Uri.fromFile(source), false)
+            repeat(2) {
+                val sorted = repository.sort()
+                sorted.store.use { store ->
+                    check(sorted.count == 3)
+                    check(store.readPage(0, 10).map { it.note } == listOf("first", "second", "third"))
+                    check(store.readPage(1, 1).single().note == "second")
+                    export.outputStream().use(store::writeXlsx)
+                    check(XlsxReader(context).readSheet(Uri.fromFile(export), null, SortingEngine.plateNames()).size == 3)
+                }
+            }
+            repository.sort("ابج1234\nابج1234").store.use { check(it.readPage(0, 10).size == 3) }
+            // Checking uses the second visible sheet.
+            source.copyTo(export, overwrite = true)
+            java.util.zip.ZipFile(export).use { input ->
+                java.util.zip.ZipOutputStream(source.outputStream()).use { output ->
+                    for (entry in input.entries()) {
+                        val bytes = input.getInputStream(entry).use { it.readBytes() }
+                        output.putNextEntry(java.util.zip.ZipEntry(entry.name))
+                        output.write(if (entry.name == "xl/workbook.xml") {
+                            bytes.toString(Charsets.UTF_8).replace("</sheets>",
+                                "<sheet name=\"checking\" sheetId=\"2\" r:id=\"rId1\"/></sheets>").toByteArray()
+                        } else bytes)
+                        output.closeEntry()
+                    }
+                }
+            }
+            repository.replaceChecking(Uri.fromFile(source))
+            val checked = repository.sort(useChecking = true)
+            checked.store.use { check(checked.count == 0) }
+            requireNotNull(checked.oldStore).use {
+                check(checked.oldCount == 3)
+                check(it.readPage(0, 10).map { row -> row.note } == listOf("first", "second", "third"))
+            }
+        } finally {
+            source.delete()
+            export.delete()
+            files.listByPrefix("$prefix.").forEach { saved ->
+                files.remove(saved.slot) {
+                    dao.imported(saved.slot)?.let { dao.deleteData(it.revision); dao.deleteWallet(it.revision) }
+                    dao.deleteImport(saved.slot)
+                }
+            }
+        }
+    }
+
     fun verifyOptionalCheckingCache() = runBlocking {
         val prefix = "optional.checking.${java.util.UUID.randomUUID()}"
         val repository = SortingRepository(context, prefix)
@@ -32,7 +99,7 @@ class RoomSortingRegression(private val context: Context) {
             repository.replaceInput(Uri.fromFile(source), false)
             // Cold sort indexes inputs even when no checking file has ever been selected.
             repository.sort().store.use {
-                check(it.readPage(0, 10).map { row -> row.note } == listOf("second", "first"))
+                check(it.readPage(0, 10).map { row -> row.note } == listOf("second", "first", "duplicate"))
             }
             val inputs = files.listByPrefix("$prefix.")
             check(inputs.all { dao.imported(it.slot) != null })
@@ -40,8 +107,8 @@ class RoomSortingRegression(private val context: Context) {
             inputs.forEach { File(requireNotNull(files.uri(it).path)).writeText("not a workbook") }
             val cached = SortingRepository(context, prefix).sort()
             cached.store.use {
-                check(cached.count == 2 && cached.oldStore == null && cached.oldCount == 0)
-                check(it.readPage(0, 10).map { row -> row.note } == listOf("second", "first"))
+                check(cached.count == 3 && cached.oldStore == null && cached.oldCount == 0)
+                check(it.readPage(0, 10).map { row -> row.note } == listOf("second", "first", "duplicate"))
             }
         } finally {
             source.delete()
@@ -396,7 +463,8 @@ class RoomSortingRegression(private val context: Context) {
                 old.execSQL("INSERT INTO saved_files VALUES('sorting.data','old.xlsx','Original.xlsx',42)")
                 old.version = 1
             }
-            val migrated = Room.databaseBuilder(context, RasedDatabase::class.java, name).build()
+            val migrated = Room.databaseBuilder(context, RasedDatabase::class.java, name)
+                .addMigrations(RasedDatabase.MIGRATION_5_6).build()
             try {
                 check(migrated.savedFiles().get("sorting.data")!!.displayName == "Original.xlsx")
                 check(migrated.sorting().imported("sorting.data") == null)
