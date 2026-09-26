@@ -217,9 +217,7 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
                 val dataFiles = listOfNotNull(files.get("$slotPrefix.data")) + files.listByPrefix("$slotPrefix.data.extra.")
                 val walletSaved = files.get("$slotPrefix.wallet")
                 val checkingSaved = files.get("$slotPrefix.checking")
-                if (!useChecking && walletText == null && dataFiles.isNotEmpty() && walletSaved != null) {
-                    return@withLock sortFast(dataFiles, walletSaved, job)
-                }
+                // Reuse indexed inputs with or without the optional checking file.
                 database.runInTransaction {
                     job.ensureActive()
                     check(dataFiles.isNotEmpty()) { "ط§ط®طھط± ظ…ظ„ظپ ط§ظ„ط¯ط§طھط§ ط£ظˆظ„ظ‹ط§" }
@@ -268,26 +266,6 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
             }
     }
 
-    private fun sortFast(dataFiles: List<SavedFile>, wallet: SavedFile, job: kotlin.coroutines.CoroutineContext): CompletedSorting {
-        val store = SortingStore(context.cacheDir)
-        try {
-            store.transaction {
-                reader.forEachSelectedRow(files.uri(wallet), null, SortingEngine.plateNames(),
-                    (SortingEngine.plateNames() + WalletHeaders.modelNames + SortingEngine.walletTypeNames() + SortingEngine.locationNames() + SortingEngine.noteNames() + SortingEngine.districtNames()).toSet(),
-                    { job.ensureActive() }, store::addWalletRow)
-                dataFiles.forEach { data ->
-                    reader.forEachSelectedRow(files.uri(data), null, SortingEngine.plateNames(),
-                        DATA_COLUMNS.flatten().toSet(), { job.ensureActive() }, store::matchDataRow)
-                }
-            }
-            val count = store.finish()
-            job.ensureActive()
-            return CompletedSorting(store, count)
-        } catch (failure: Throwable) {
-            store.close()
-            throw failure
-        }
-    }
     fun exportResults(store: ResultStore, uri: Uri) {
         requireNotNull(context.contentResolver.openOutputStream(uri, "wt")) { "طھط¹ط°ط± ط­ظپط¸ ط§ظ„ظ†طھط§ط¦ط¬" }.use(store::writeXlsx)
     }

@@ -50,6 +50,12 @@ class XlsxRegressionInstrumentation : Instrumentation() {
                 return
             }
             roomMode?.let {
+                if (it == "optional-checking") {
+                    RoomSortingRegression(targetContext).verifyOptionalCheckingCache()
+                    result.putString("stream", "PASS: sorting without checking reuses indexed inputs\n")
+                    finish(Activity.RESULT_OK, result)
+                    return
+                }
                 if (it == "links") {
                     HyperlinkRegression(targetContext).run()
                     result.putString("stream", "PASS: embedded hyperlinks, HYPERLINK formulas, direct URLs, repository import, open intent\n")

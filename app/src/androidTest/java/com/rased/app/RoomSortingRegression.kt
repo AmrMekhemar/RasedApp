@@ -16,6 +16,44 @@ import kotlinx.coroutines.runBlocking
 
 /** Production repository checks in dedicated slots, preserving the user's inputs. */
 class RoomSortingRegression(private val context: Context) {
+    fun verifyOptionalCheckingCache() = runBlocking {
+        val prefix = "optional.checking.${java.util.UUID.randomUUID()}"
+        val repository = SortingRepository(context, prefix)
+        val files = SavedFileStorage(context)
+        val dao = RasedDatabase.getInstance(context).sorting()
+        val source = File.createTempFile("optional-checking-", ".xlsx", context.cacheDir)
+        try {
+            write(source, listOf("اللوحة", "الملاحظة"), listOf(
+                listOf("ابج1234", "first"), listOf("ابج1234", "duplicate"),
+                listOf("دهو5678", "second")
+            ))
+            repository.replaceInput(Uri.fromFile(source), true)
+            write(source, listOf("اللوحة"), listOf(listOf("دهو5678"), listOf("ابج1234")))
+            repository.replaceInput(Uri.fromFile(source), false)
+            // Cold sort indexes inputs even when no checking file has ever been selected.
+            repository.sort().store.use {
+                check(it.readPage(0, 10).map { row -> row.note } == listOf("second", "first"))
+            }
+            val inputs = files.listByPrefix("$prefix.")
+            check(inputs.all { dao.imported(it.slot) != null })
+            // Make any accidental Excel reread fail deterministically, without timing thresholds.
+            inputs.forEach { File(requireNotNull(files.uri(it).path)).writeText("not a workbook") }
+            val cached = SortingRepository(context, prefix).sort()
+            cached.store.use {
+                check(cached.count == 2 && cached.oldStore == null && cached.oldCount == 0)
+                check(it.readPage(0, 10).map { row -> row.note } == listOf("second", "first"))
+            }
+        } finally {
+            source.delete()
+            files.listByPrefix("$prefix.").forEach { saved ->
+                files.remove(saved.slot) {
+                    dao.imported(saved.slot)?.let { dao.deleteData(it.revision); dao.deleteWallet(it.revision) }
+                    dao.deleteImport(saved.slot)
+                }
+            }
+        }
+    }
+
     fun run(verifyAfterRestart: Boolean) = runBlocking {
         if (!verifyAfterRestart) {
             verifyMigration()
