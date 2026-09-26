@@ -140,14 +140,7 @@ private fun ResultCardHeader(result: SortingResult) {
                 Icon(painterResource(R.drawable.ic_result_truck), null, tint = CardMuted,
                     modifier = Modifier.size(18.dp))
                 Text(buildAnnotatedString {
-                    val fields = listOf(
-                        "النوع" to (result.type?.takeIf { it.isNotBlank() } ?: "-"),
-                        "الطراز" to result.walletModel,
-                        "الملاحظة" to result.note,
-                        "اللون" to result.walletType,
-                        "الشارع" to result.street,
-                        "الحي" to result.district
-                    ).filter { !it.second.isNullOrBlank() }
+                    val fields = result.cardFields()
                     fields.forEachIndexed { index, (label, value) ->
                         if (index > 0) withStyle(SpanStyle(color = CardMuted)) { append("  |  ") }
                         withStyle(SpanStyle(color = CardMuted)) { append("$label: ") }
@@ -232,9 +225,17 @@ private fun ResultCardFooter(result: SortingResult) {
     }
 }
 
-private fun SortingResult.cardDetails(): String = listOf(
-    "اللوحة" to plate, "النوع" to type, "الحي" to district, "الشارع" to street,
-    "الموقع" to location, "التاريخ" to date, "اللون" to walletType, "الملاحظة" to note
+private fun SortingResult.cardFields(): List<Pair<String, String?>> = listOf(
+    "النوع" to (type?.takeIf { it.isNotBlank() } ?: "-"),
+    "الطراز" to walletModel,
+    "الملاحظة" to note,
+    "اللون" to walletType,
+    "الشارع" to street,
+    "الحي" to district
+).filter { !it.second.isNullOrBlank() }
+
+private fun SortingResult.cardDetails(): String = (
+    listOf("اللوحة" to plate) + cardFields() + listOf("التاريخ" to date, "الموقع" to location)
 ).filter { (_, value) -> !value.isNullOrBlank() }
     .joinToString("\n") { (label, value) -> "$label: $value" }
 
