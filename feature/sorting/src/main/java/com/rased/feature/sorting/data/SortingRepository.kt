@@ -161,7 +161,7 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
         val walletBatch = ArrayList<IndexedWalletRow>(IMPORT_BATCH_SIZE)
         var keys: List<String?>? = null
         var sequence = 0L
-        val aliases = if (isData) DATA_COLUMNS else listOf(SortingEngine.plateNames(), WalletHeaders.modelNames, SortingEngine.walletTypeNames(), SortingEngine.locationNames())
+        val aliases = if (isData) DATA_COLUMNS else listOf(SortingEngine.plateNames(), WalletHeaders.modelNames, SortingEngine.walletTypeNames(), SortingEngine.locationNames(), SortingEngine.noteNames(), SortingEngine.districtNames())
         progress(isData, 0, 0)
         reader.forEachSelectedRow(files.uri(saved), null, SortingEngine.plateNames(), aliases.flatten().toSet(), checkActive, { row ->
             checkActive()
@@ -177,7 +177,7 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
             val normalized = PlateNormalizer.normalize(plate)
             if (normalized != null) {
                 if (isData) dataBatch += IndexedDataRow(revision, normalized, plate!!, values[1], values[2], values[3], values[4], values[5], values[6])
-                else walletBatch += IndexedWalletRow(revision, normalized, sequence, values[2], values[3], values[1])
+                else walletBatch += IndexedWalletRow(revision, normalized, sequence, values[2], values[3], values[1], values[4], values[5])
             }
             sequence++
             if (dataBatch.size >= IMPORT_BATCH_SIZE) { dao.insertData(dataBatch); dataBatch.clear() }
@@ -273,7 +273,7 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
         try {
             store.transaction {
                 reader.forEachSelectedRow(files.uri(wallet), null, SortingEngine.plateNames(),
-                    (SortingEngine.plateNames() + WalletHeaders.modelNames + SortingEngine.walletTypeNames() + SortingEngine.locationNames()).toSet(),
+                    (SortingEngine.plateNames() + WalletHeaders.modelNames + SortingEngine.walletTypeNames() + SortingEngine.locationNames() + SortingEngine.noteNames() + SortingEngine.districtNames()).toSet(),
                     { job.ensureActive() }, store::addWalletRow)
                 dataFiles.forEach { data ->
                     reader.forEachSelectedRow(files.uri(data), null, SortingEngine.plateNames(),
@@ -294,14 +294,14 @@ class SortingRepository(private val context: Context, private val slotPrefix: St
 
     private companion object {
         val operationMutex = Mutex()
-        const val PARSER_VERSION = 12
+        const val PARSER_VERSION = 13
         const val IMPORT_BATCH_SIZE = 512
         val DATA_COLUMNS = listOf(
             SortingEngine.plateNames(),
             setOf("النوع", "نوع"),
-            setOf("الملاحظة", "ملاحظة", "الملاحظات"),
+            SortingEngine.noteNames(),
             setOf("الشارع", "شارع"),
-            setOf("الحي", "حى"),
+            SortingEngine.districtNames(),
             setOf("التاريخ", "تاريخ"),
             SortingEngine.locationNames()
         )

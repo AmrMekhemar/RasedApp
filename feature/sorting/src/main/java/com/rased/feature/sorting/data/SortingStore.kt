@@ -25,9 +25,9 @@ class SortingStore(cacheDir: File) : ResultStore {
     init {
         db.execSQL("PRAGMA cache_size = -2048")
         db.execSQL("PRAGMA temp_store = FILE")
-        db.execSQL("CREATE TABLE wallet (sequence INTEGER PRIMARY KEY, normalized TEXT UNIQUE NOT NULL, walletType TEXT, walletModel TEXT, plate TEXT, type TEXT, note TEXT, street TEXT, district TEXT, date TEXT, location TEXT, walletLocation TEXT)")
+        db.execSQL("CREATE TABLE wallet (sequence INTEGER PRIMARY KEY, normalized TEXT UNIQUE NOT NULL, walletType TEXT, walletModel TEXT, plate TEXT, type TEXT, note TEXT, street TEXT, district TEXT, date TEXT, location TEXT, walletLocation TEXT, walletNote TEXT, walletDistrict TEXT)")
         db.execSQL("CREATE TABLE results (id INTEGER PRIMARY KEY, plate TEXT, type TEXT, note TEXT, street TEXT, district TEXT, date TEXT, walletType TEXT, location TEXT, walletModel TEXT)")
-        walletInsert = db.compileStatement("INSERT OR IGNORE INTO wallet(normalized, walletType, walletModel, walletLocation) VALUES (?, ?, ?, ?)")
+        walletInsert = db.compileStatement("INSERT OR IGNORE INTO wallet(normalized, walletType, walletModel, walletLocation, walletNote, walletDistrict) VALUES (?, ?, ?, ?, ?, ?)")
         matchUpdate = db.compileStatement("UPDATE wallet SET plate=?, type=?, note=?, street=?, district=?, date=?, location=? WHERE normalized=? AND plate IS NULL")
     }
 
@@ -42,15 +42,17 @@ class SortingStore(cacheDir: File) : ResultStore {
     }
 
     fun addWalletRow(row: Map<String, String>) {
-        addWalletPlate(value(row, SortingEngine.plateNames()), value(row, SortingEngine.walletTypeNames()), WalletHeaders.modelValue(row), value(row, SortingEngine.locationNames()))
+        addWalletPlate(value(row, SortingEngine.plateNames()), value(row, SortingEngine.walletTypeNames()), WalletHeaders.modelValue(row), value(row, SortingEngine.locationNames()), value(row, SortingEngine.noteNames()), value(row, SortingEngine.districtNames()))
     }
 
-    fun addWalletPlate(plate: String?, type: String? = null, model: String? = null, location: String? = null) {
+    fun addWalletPlate(plate: String?, type: String? = null, model: String? = null, location: String? = null, note: String? = null, district: String? = null) {
         val normalized = PlateNormalizer.normalize(plate) ?: return
         walletInsert.bindString(1, normalized)
         walletInsert.bindText(2, type)
         walletInsert.bindText(3, model)
         walletInsert.bindText(4, location)
+        walletInsert.bindText(5, note)
+        walletInsert.bindText(6, district)
         walletInsert.executeInsert()
     }
 
@@ -59,9 +61,9 @@ class SortingStore(cacheDir: File) : ResultStore {
         val normalized = PlateNormalizer.normalize(plate) ?: return
         matchUpdate.bindText(1, plate)
         matchUpdate.bindText(2, value(row, setOf("النوع", "نوع")))
-        matchUpdate.bindText(3, value(row, setOf("الملاحظة", "ملاحظة", "الملاحظات")))
+        matchUpdate.bindText(3, value(row, SortingEngine.noteNames()))
         matchUpdate.bindText(4, value(row, setOf("الشارع", "شارع")))
-        matchUpdate.bindText(5, value(row, setOf("الحي", "حى")))
+        matchUpdate.bindText(5, value(row, SortingEngine.districtNames()))
         matchUpdate.bindText(6, value(row, setOf("التاريخ", "تاريخ")))
         matchUpdate.bindText(7, value(row, SortingEngine.locationNames()))
         matchUpdate.bindString(8, normalized)
@@ -70,7 +72,7 @@ class SortingStore(cacheDir: File) : ResultStore {
 
     fun finish(): Int {
         // Dense row ids allow indexed page access without a growing SQL OFFSET.
-        db.execSQL("INSERT INTO results(plate,type,note,street,district,date,walletType,location,walletModel) SELECT plate,type,note,street,district,date,walletType,COALESCE(location,walletLocation),walletModel FROM wallet WHERE plate IS NOT NULL ORDER BY sequence")
+        db.execSQL("INSERT INTO results(plate,type,note,street,district,date,walletType,location,walletModel) SELECT plate,type,COALESCE(note,walletNote),street,COALESCE(district,walletDistrict),date,walletType,COALESCE(location,walletLocation),walletModel FROM wallet WHERE plate IS NOT NULL ORDER BY sequence")
         db.execSQL("DROP TABLE wallet")
         return db.compileStatement("SELECT COUNT(*) FROM results").use { it.simpleQueryForLong().toInt() }
     }
@@ -136,7 +138,7 @@ class SortingStore(cacheDir: File) : ResultStore {
         val exact = row.entries.filter { ExcelHeaders.normalize(it.key) in normalizedAliases }
             .sortedWith(compareByDescending<Map.Entry<String, String>> { it.key.contains("عربي") })
             .firstOrNull()?.value
-        val color = row.entries.firstOrNull { ExcelHeaders.normalize(it.key).contains("لون") }?.value
+        val color = if (aliases == SortingEngine.walletTypeNames()) row.entries.firstOrNull { ExcelHeaders.normalize(it.key).contains("لون") }?.value else null
         return (exact ?: color)?.ifBlank { null }
     }
     companion object {

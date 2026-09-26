@@ -10,6 +10,9 @@ object SortingEngine {
     )
     private val walletTypeNames = setOf("اللون", "لون", "color", "colour")
 
+    fun noteNames(): Set<String> = setOf("الملاحظة","الملاحظه", "ملاحظة", "ملاحظه", "الملاحظات", "ملاحظات", "note", "notes")
+    fun districtNames(): Set<String> = setOf("الحي", "الحى", "حي", "حى", "district")
+
     fun locationNames(): Set<String> = setOf("الموقع", "موقع")
 
     fun plateNames(): Set<String> = plateColumnNames
@@ -40,9 +43,9 @@ object SortingEngine {
             results += SortingResult(
                 plate = dataRow[dataPlateHeader].orEmpty(),
                 type = firstValueOrNull(dataRow, listOf("النوع", "نوع")),
-                note = firstValueOrNull(dataRow, listOf("الملاحظة", "ملاحظة", "الملاحظات")),
+                note = firstValueOrNull(dataRow, noteNames().toList()) ?: firstValueOrNull(walletRow, noteNames().toList()),
                 street = firstValueOrNull(dataRow, listOf("الشارع", "شارع")),
-                district = firstValueOrNull(dataRow, listOf("الحي", "حى")),
+                district = firstValueOrNull(dataRow, districtNames().toList()) ?: firstValueOrNull(walletRow, districtNames().toList()),
                 date = firstValueOrNull(dataRow, listOf("التاريخ", "تاريخ")),
                 walletType = walletTypeHeader?.let { walletRow[it].orEmpty().ifBlank { null } },
                 walletModel = WalletHeaders.modelValue(walletRow),
